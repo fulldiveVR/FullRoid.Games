@@ -1,0 +1,16 @@
+# Documentation
+docs/
+
+# Build directories and intermediate artifacts
+build/
+**/*.elf
+**/*.map
+**/*.lst
+**/*.d
+
+# Intermediate ROMs in build source dirs (canonical output lives in repository/)
+snake/snake-nds/*.nds
+snake/snake-3ds/*.3dsx
+
+# macOS metadata
+.DS_Store
