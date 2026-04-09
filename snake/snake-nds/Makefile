@@ -4,10 +4,13 @@ ifeq ($(strip $(DEVKITARM)),)
   $(error "Set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM")
 endif
 
-include $(DEVKITARM)/ds_rules
+# base_rules instead of ds_rules — avoids calico bootstub which hangs in emulators.
+# We provide compatibility stubs in calico_compat.c for the API gaps.
+include $(DEVKITARM)/base_rules
 
-# ds_rules uses $(LD) which defaults to arm-none-eabi-ld; gcc is needed for -specs=/-mthumb
-LD := $(CC)
+LD       := $(CC)
+LIBNDS   := $(DEVKITPRO)/libnds
+CALICO   := $(DEVKITPRO)/calico
 
 #---------------------------------------------------------------------------------
 TARGET   := snake
@@ -22,16 +25,19 @@ INCLUDES := source \
             ../snake-common/sprites
 #---------------------------------------------------------------------------------
 
-ARCH     := -march=armv5te -mtune=arm946e-s -mthumb
+ARCH     := -march=armv5te -mtune=arm946e-s -mthumb -mthumb-interwork
 
-CFLAGS   := -g -Wall -O2 -ffunction-sections -fdata-sections \
-            $(ARCH)
-CFLAGS   += $(INCLUDE) -DARM9 -DNDS
+CFLAGS   := -g -Wall -O2 -fomit-frame-pointer -ffunction-sections -fdata-sections \
+            $(ARCH) $(INCLUDE) -DARM9 -DNDS -D__NDS__
 ASFLAGS  := -g $(ARCH)
 LDFLAGS   = -specs=ds_arm9.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
+# libnds9 only — calico_compat.c provides stubs for calico functions
 LIBS     := -lnds9
 LIBDIRS  := $(LIBNDS)
+
+GAME_ICON := $(DEVKITPRO)/calico/share/nds-icon.bmp
+GAME_TITLE := snake
 
 #---------------------------------------------------------------------------------
 ifneq ($(BUILD),$(notdir $(CURDIR)))
@@ -48,18 +54,25 @@ SFILES   := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(CURDIR)/$(dir)/*.s)))
 export OFILES   := $(CFILES:.c=.o) $(SFILES:.s=.o)
 export INCLUDE  := $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
                    $(foreach dir,$(LIBDIRS),-I$(dir)/include) \
+                   -I$(CALICO)/include \
                    -I$(CURDIR)/$(BUILD)
-export LIBPATHS := $(foreach dir,$(LIBDIRS),-L$(dir)/lib)
+export LIBPATHS := $(foreach dir,$(LIBDIRS),-L$(dir)/lib) -L$(CALICO)/lib
+
+export CFLAGS LDFLAGS LIBS LD
 
 .PHONY: $(BUILD) clean
 
-$(BUILD):
+$(BUILD): arm7/arm7_stub.elf
 	@[ -d $@ ] || mkdir -p $@
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
+arm7/arm7_stub.elf: arm7/arm7_stub.s
+	@arm-none-eabi-as -mcpu=arm7tdmi -o arm7/arm7_stub.o $<
+	@arm-none-eabi-ld -Ttext=0x037F8000 -o $@ arm7/arm7_stub.o
+
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).nds
+	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).nds arm7/*.o arm7/*.elf
 
 #---------------------------------------------------------------------------------
 else
@@ -67,8 +80,14 @@ else
 
 DEPENDS := $(OFILES:.o=.d)
 
-$(OUTPUT).nds   :  $(OUTPUT).elf
-$(OUTPUT).elf   :  $(OFILES)
+# ndstool: -h 0x200 = old homebrew header (no secure area, works in all emulators)
+$(OUTPUT).nds : $(OUTPUT).elf $(TOPDIR)/arm7/arm7_stub.elf
+	@ndstool -c $@ -h 0x200 -9 $< -7 $(TOPDIR)/arm7/arm7_stub.elf -b $(GAME_ICON) "$(GAME_TITLE);built with devkitARM;http://devkitpro.org"
+	@echo built ... $(notdir $@)
+
+$(OUTPUT).elf : $(OFILES)
+	@echo linking $(notdir $@)
+	@$(LD) $(LDFLAGS) $(OFILES) $(LIBPATHS) $(LIBS) -o $@
 
 include $(DEVKITARM)/base_rules
 

@@ -32,7 +32,7 @@ typedef enum {
 typedef struct {
     Language    id;
     const char *code;         /* "ru", "el"        */
-    const char *native_name;  /* "Русский", "English" — показывается в кнопке */
+    const char *native_name;  /* "Русский", "English" — displayed on the button */
 } LangMeta;
 
 extern const LangMeta        LANG_META[LANG_COUNT];
@@ -42,5 +42,5 @@ void        lang_set(Language lang);
 Language    lang_get_current(void);
 const char *lang_str(StringID id);
 
-/* Реализация в render_nds.c / render_3ds.c */
+/* Implemented in render_nds.c / render_3ds.c */
 Language    lang_detect_system(void);

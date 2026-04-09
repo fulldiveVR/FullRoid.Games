@@ -2,13 +2,13 @@
 #include <stdint.h>
 
 /*
- * Объёмные пиксель-арт спрайты.
- * Индексы: 0=прозрачно  1=блик  2=основной  3=тёмный  4=тень
+ * Volumetric pixel-art sprites.
+ * Indices: 0=transparent  1=highlight  2=main  3=dark  4=shadow
  *
- * Освещение сверху-слева, тень снизу-справа.
+ * Lighting from top-left, shadow at bottom-right.
  */
 
-/* ── 8×8 (3DS, клетка 8px) ────────────────────────────────────────── */
+/* ── 8×8 (3DS, cell 8px) ────────────────────────────────────────── */
 
 static const uint8_t SPR_FOOD_8x8[8][8] = {
     {0,0,1,1,2,2,0,0},
@@ -21,35 +21,35 @@ static const uint8_t SPR_FOOD_8x8[8][8] = {
     {0,0,0,3,4,4,0,0},
 };
 
-/* Голова вправо 8×8 (E = зрачок) */
+/* Head right 8×8 (E = pupil) */
 static const uint8_t SPR_HEAD_RIGHT_8x8[8][8] = {
     {0,0,1,1,2,2,0,0},
     {0,1,1,2,2,2,3,0},
     {1,1,2,2,2,3,3,3},
-    {1,2,2,4,3,3,3,3},  /* зрачок на 3-й позиции */
+    {1,2,2,4,3,3,3,3},  /* pupil at position 3 */
     {2,2,3,3,3,3,3,3},
     {0,3,3,3,3,3,4,0},
     {0,0,3,3,3,4,4,0},
     {0,0,0,3,4,4,0,0},
 };
 
-/* Голова влево 8×8 */
+/* Head left 8×8 */
 static const uint8_t SPR_HEAD_LEFT_8x8[8][8] = {
     {0,0,2,2,1,1,0,0},
     {0,3,2,2,2,1,1,0},
     {3,3,3,2,2,2,1,1},
-    {3,3,3,3,3,4,2,1},  /* зрачок */
+    {3,3,3,3,3,4,2,1},  /* pupil */
     {3,3,3,3,3,3,2,2},
     {0,4,3,3,3,3,3,0},
     {0,0,4,4,3,3,3,0},
     {0,0,0,4,4,3,0,0},
 };
 
-/* Голова вверх 8×8 */
+/* Head up 8×8 */
 static const uint8_t SPR_HEAD_UP_8x8[8][8] = {
     {0,0,1,1,1,1,0,0},
     {0,1,1,1,2,2,2,0},
-    {1,1,2,4,2,2,2,3},  /* зрачок */
+    {1,1,2,4,2,2,2,3},  /* pupil */
     {1,2,2,2,2,2,3,3},
     {2,2,2,3,3,3,3,3},
     {0,3,3,3,3,3,4,0},
@@ -57,19 +57,19 @@ static const uint8_t SPR_HEAD_UP_8x8[8][8] = {
     {0,0,0,4,4,0,0,0},
 };
 
-/* Голова вниз 8×8 */
+/* Head down 8×8 */
 static const uint8_t SPR_HEAD_DOWN_8x8[8][8] = {
     {0,0,0,4,4,0,0,0},
     {0,0,3,3,3,4,4,0},
     {0,3,3,3,3,3,4,0},
     {2,2,2,3,3,3,3,3},
     {1,2,2,2,2,2,3,3},
-    {1,1,2,4,2,2,2,3},  /* зрачок */
+    {1,1,2,4,2,2,2,3},  /* pupil */
     {0,1,1,1,2,2,2,0},
     {0,0,1,1,1,1,0,0},
 };
 
-/* ── 6×6 (NDS, клетка 6px) ────────────────────────────────────────── */
+/* ── 6×6 (NDS, cell 6px) ────────────────────────────────────────── */
 
 static const uint8_t SPR_FOOD_6x6[6][6] = {
     {0,1,2,2,3,0},
@@ -80,77 +80,77 @@ static const uint8_t SPR_FOOD_6x6[6][6] = {
     {0,0,3,4,0,0},
 };
 
-/* Голова вправо 6×6 */
+/* Head right 6×6 */
 static const uint8_t SPR_HEAD_RIGHT_6x6[6][6] = {
     {0,1,2,2,3,0},
     {1,1,2,2,3,3},
-    {1,2,4,2,3,3},  /* зрачок */
+    {1,2,4,2,3,3},  /* pupil */
     {2,2,2,3,3,3},
     {0,3,3,3,4,0},
     {0,0,3,4,0,0},
 };
 
-/* Голова влево 6×6 */
+/* Head left 6×6 */
 static const uint8_t SPR_HEAD_LEFT_6x6[6][6] = {
     {0,3,2,2,1,0},
     {3,3,2,2,1,1},
-    {3,3,2,4,2,1},  /* зрачок */
+    {3,3,2,4,2,1},  /* pupil */
     {3,3,3,2,2,2},
     {0,4,3,3,3,0},
     {0,0,4,3,0,0},
 };
 
-/* Голова вверх 6×6 */
+/* Head up 6×6 */
 static const uint8_t SPR_HEAD_UP_6x6[6][6] = {
     {0,1,1,1,1,0},
     {1,1,2,2,2,3},
-    {1,2,4,2,3,3},  /* зрачок */
+    {1,2,4,2,3,3},  /* pupil */
     {2,2,2,3,3,3},
     {0,3,3,3,4,0},
     {0,0,3,4,0,0},
 };
 
-/* Голова вниз 6×6 */
+/* Head down 6×6 */
 static const uint8_t SPR_HEAD_DOWN_6x6[6][6] = {
     {0,0,3,4,0,0},
     {0,3,3,3,4,0},
     {2,2,2,3,3,3},
-    {1,2,4,2,3,3},  /* зрачок */
+    {1,2,4,2,3,3},  /* pupil */
     {1,1,2,2,2,3},
     {0,1,1,1,1,0},
 };
 
-/* ── Палитры (RGBA8888, 0=прозрачный) ────────────────────────────── */
+/* ── Palettes (RGBA8888, 0=transparent) ────────────────────────────── */
 
 static const uint32_t PALETTE_RED[5] = {
-    0x00000000u,  /* прозрачный */
-    0xFF9999FFu,  /* блик        #FF9999 */
-    0x2222DDFFu,  /* основной    #DD2222 */
-    0x001199FFu,  /* тёмный      #991100 */
-    0x000044FFu,  /* тень        #440000 */
+    0x00000000u,  /* transparent */
+    0xFF9999FFu,  /* highlight    #FF9999 */
+    0x2222DDFFu,  /* main        #DD2222 */
+    0x001199FFu,  /* dark        #991100 */
+    0x000044FFu,  /* shadow      #440000 */
 };
 
 static const uint32_t PALETTE_BLUE[5] = {
     0x00000000u,
-    0xFFCC99FFu,  /* блик        #99CCFF */
-    0xEE5522FFu,  /* основной    #2255EE */
-    0xAA3300FFu,  /* тёмный      #0033AA */
-    0x551100FFu,  /* тень        #001155 */
+    0xFFCC99FFu,  /* highlight    #99CCFF */
+    0xEE5522FFu,  /* main        #2255EE */
+    0xAA3300FFu,  /* dark        #0033AA */
+    0x551100FFu,  /* shadow      #001155 */
 };
 
-/* Зелёные оттенки для головы */
+/* Green shades for the head */
 static const uint32_t PALETTE_HEAD[5] = {
     0x00000000u,
-    0xAAFF99FFu,  /* блик  */
-    0x22BB44FFu,  /* основной */
-    0x007722FFu,  /* тёмный */
-    0x003311FFu,  /* тень  */
+    0xAAFF99FFu,  /* highlight */
+    0x22BB44FFu,  /* main */
+    0x007722FFu,  /* dark */
+    0x003311FFu,  /* shadow */
 };
 
-/* ── RGB555 для NDS (формат: ABBBBBGGGGGRRRRR) ─────────────────────
- * Макрос: RGB15(r,g,b) где каждый канал 0-31
+/* ── RGB555 for NDS (format: ABBBBBGGGGGRRRRR) ─────────────────────
+ * Macro: RGB15(r,g,b) where each channel is 0-31
  */
-#define NDS_PALETTE_RED_0   0x0000u   /* прозрачный (key) */
+#define NDS_PALETTE_RED_0   0x0000u   /* transparent (key) */
 #define NDS_PALETTE_RED_1   0x639Fu   /* #FF9999: r=31 g=12 b=12 */
 #define NDS_PALETTE_RED_2   0x0457u   /* #DD2222: r=27 g=4  b=4  */
 #define NDS_PALETTE_RED_3   0x0053u   /* #991100: r=19 g=2  b=0  */
@@ -163,12 +163,12 @@ static const uint32_t PALETTE_HEAD[5] = {
 #define NDS_PALETTE_BLUE_4  0x2800u   /* #001155: r=0  g=2  b=10 */
 
 #define NDS_PALETTE_HEAD_0  0x0000u
-#define NDS_PALETTE_HEAD_1  0x4BF5u   /* блик  зелёный */
-#define NDS_PALETTE_HEAD_2  0x0D04u   /* основной      */
-#define NDS_PALETTE_HEAD_3  0x03C0u   /* тёмный        */
-#define NDS_PALETTE_HEAD_4  0x01C0u   /* тень          */
+#define NDS_PALETTE_HEAD_1  0x4BF5u   /* highlight green */
+#define NDS_PALETTE_HEAD_2  0x0D04u   /* main            */
+#define NDS_PALETTE_HEAD_3  0x03C0u   /* dark            */
+#define NDS_PALETTE_HEAD_4  0x01C0u   /* shadow          */
 
-/* Указатель на нужный спрайт головы по DirIndex */
+/* Pointer to the correct head sprite by DirIndex */
 #ifdef NDS
 static const uint8_t (* const HEAD_SPRITES_NDS[4])[6] = {
     SPR_HEAD_UP_6x6,

@@ -24,10 +24,10 @@
 #define WIN_LENGTH     200
 #define MAX_FOOD         5
 #define FOOD_EFFECT      5
-#define SPEED_MIN        8   /* клеток/сек */
+#define SPEED_MIN        8   /* cells/sec */
 #define SPEED_MAX       25
 
-/* Кнопка смены языка на нижнем экране */
+/* Language switch button on the bottom screen */
 #define LANG_BTN_X       8
 #define LANG_BTN_H      24
 #ifdef NDS

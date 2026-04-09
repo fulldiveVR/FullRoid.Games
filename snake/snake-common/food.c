@@ -58,7 +58,7 @@ void food_spawn(Food *f, const Snake *s) {
 void food_update(Food *f, const Snake *s) {
     const Point dirs[4] = {{0,-1},{0,1},{-1,0},{1,0}};
 
-    /* Случайное движение еды (20% за ход) */
+    /* Random food movement (20% chance per step) */
     for (int i = 0; i < f->count; i++) {
         if (rand_range(5) != 0) continue;
         Point d  = dirs[rand_range(4)];
@@ -78,7 +78,7 @@ void food_update(Food *f, const Snake *s) {
         }
     }
 
-    /* Смена типа одной случайной еды раз в 20 ходов */
+    /* Switch type of one random food item every 20 steps */
     f->type_change_counter++;
     if (f->type_change_counter >= 20 && f->count > 0) {
         f->type_change_counter = 0;
@@ -87,7 +87,7 @@ void food_update(Food *f, const Snake *s) {
             (f->items[idx].type == FOOD_RED) ? FOOD_BLUE : FOOD_RED;
     }
 
-    /* Гарантируем минимум 1 еды каждого типа */
+    /* Guarantee at least 1 food item of each type */
     int has_red = 0, has_blue = 0;
     for (int i = 0; i < f->count; i++) {
         if (f->items[i].type == FOOD_RED)  has_red  = 1;
@@ -101,7 +101,7 @@ int food_check_collision(Food *f, Point head, int *out_type) {
     for (int i = 0; i < f->count; i++) {
         if (f->items[i].x == head.x && f->items[i].y == head.y) {
             *out_type = f->items[i].type;
-            /* Удаляем еду из массива */
+            /* Remove food item from array */
             f->items[i] = f->items[f->count - 1];
             f->count--;
             return 1;

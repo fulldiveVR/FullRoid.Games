@@ -1,34 +1,66 @@
 #include "render_nds.h"
+#include "font_unicode.h"
 #include "../../snake-common/sprites/sprite_data.h"
 #include <nds.h>
 #include <stdio.h>
 #include <string.h>
 
-/* ── Top screen: framebuffer Mode 5 ───────────────────────────────── */
+/* ── Top screen: double-buffered framebuffer ─────────────────────── */
 
-static uint16_t *fb_top = NULL;
+static uint16_t *fb_back = NULL;   /* back buffer (we draw here) */
+static int fb_page = 0;            /* 0 = display A / draw B, 1 = display B / draw A */
 
+/* Fast full-screen clear using 32-bit writes (2 pixels at a time) */
+static void fb_clear(uint16_t color) {
+    uint32_t c2 = color | ((uint32_t)color << 16);
+    uint32_t *p = (uint32_t *)fb_back;
+    /* 256*192 = 49152 pixels = 24576 uint32 writes */
+    for (int i = 0; i < 24576; i++)
+        p[i] = c2;
+}
+
+/* Inline pixel write — no bounds check (caller must ensure valid coords) */
+#define FB_PUT_FAST(x, y, color) fb_back[(y) * SCREEN_W + (x)] = (color)
+
+/* Safe pixel write with bounds check */
 static inline void fb_put(int x, int y, uint16_t color) {
-    if (x < 0 || x >= SCREEN_W || y < 0 || y >= SCREEN_H) return;
-    fb_top[y * SCREEN_W + x] = color;
+    if ((unsigned)x < SCREEN_W && (unsigned)y < SCREEN_H)
+        fb_back[y * SCREEN_W + x] = color;
 }
 
-static void fb_fill_rect(int x, int y, int w, int h, uint16_t color) {
-    for (int dy = 0; dy < h; dy++)
-        for (int dx = 0; dx < w; dx++)
-            fb_put(x + dx, y + dy, color);
-}
-
-/* Draw a 6×6 sprite with an RGB555 palette */
+/* Draw a 6×6 sprite with an RGB555 palette — bounds-checked */
 static void draw_sprite6(int x, int y,
                          const uint8_t spr[6][6],
                          const uint16_t pal[5]) {
     for (int dy = 0; dy < 6; dy++)
         for (int dx = 0; dx < 6; dx++) {
             uint8_t idx = spr[dy][dx];
-            if (idx == 0) continue;
-            fb_put(x + dx, y + dy, pal[idx]);
+            if (idx) fb_put(x + dx, y + dy, pal[idx]);
         }
+}
+
+/* 6×6 circular body: precomputed as bitmask per row.
+ * Row 0: ..XX.. = 0x0C, Row 1: .XXXX. = 0x1E, Row 2-3: XXXXXX = 0x3F */
+static const uint8_t BODY_MASK[6] = { 0x0C, 0x1E, 0x3F, 0x3F, 0x1E, 0x0C };
+
+/* Draw 6×6 body circle — fast path when fully on-screen */
+static void draw_body6(int x, int y, uint16_t color) {
+    if (x >= 0 && x + 5 < SCREEN_W && y >= 0 && y + 5 < SCREEN_H) {
+        /* Fully on-screen: no per-pixel bounds check */
+        for (int dy = 0; dy < 6; dy++) {
+            uint16_t *row = &fb_back[(y + dy) * SCREEN_W + x];
+            uint8_t m = BODY_MASK[dy];
+            for (int dx = 0; dx < 6; dx++)
+                if (m & (0x20 >> dx)) row[dx] = color;
+        }
+    } else {
+        /* Edge case: per-pixel bounds check */
+        for (int dy = 0; dy < 6; dy++) {
+            uint8_t m = BODY_MASK[dy];
+            for (int dx = 0; dx < 6; dx++)
+                if (m & (0x20 >> dx)) fb_put(x + dx, y + dy, color);
+        }
+    }
 }
 
 /* Snake body colour — 3-zone gradient (head=green → mid=blue → tail=red) */
@@ -39,16 +71,29 @@ static uint16_t snake_segment_color(int idx, int length) {
     return             RGB15(28,  5,  5);     /* red   */
 }
 
+/* Swap front/back buffers — call once per frame during VBlank */
+void render_swap(void) {
+    /* DISPCNT bits 18-19 select displayed VRAM bank: 0=A, 1=B */
+    if (fb_page) {
+        REG_DISPCNT = MODE_FB0;                   /* display A */
+        fb_back = (uint16_t *)VRAM_B;             /* draw to B */
+    } else {
+        REG_DISPCNT = MODE_FB0 | (1 << 18);       /* display B */
+        fb_back = (uint16_t *)VRAM_A;             /* draw to A */
+    }
+    fb_page ^= 1;
+}
+
 /* ── Initialisation ────────────────────────────────────────────────── */
 void render_init(void) {
     videoSetMode(MODE_FB0);
     vramSetBankA(VRAM_A_LCD);
-    fb_top = (uint16_t *)VRAM_A;
+    vramSetBankB(VRAM_B_LCD);
+    fb_back = (uint16_t *)VRAM_B;  /* first frame: display A, draw to B */
+    fb_page = 0;
 
-    /* Bottom screen — text console via libnds */
-    videoSetModeSub(MODE_0_2D);
-    vramSetBankC(VRAM_C_SUB_BG);
-    consoleInit(NULL, 3, BgType_Text4bpp, BgSize_T_256x256, 31, 0, false, true);
+    /* Bottom screen — custom Unicode tile console */
+    text_init();
 }
 
 /* ── Top screen ────────────────────────────────────────────────────── */
@@ -67,8 +112,8 @@ static const uint16_t PAL_HEAD_NDS[5] = {
 };
 
 void render_top(const Game *g) {
-    /* Clear */
-    fb_fill_rect(0, 0, SCREEN_W, SCREEN_H, RGB15(1, 1, 3));
+    /* Clear — fast 32-bit fill */
+    fb_clear(RGB15(1, 1, 3));
 
     int fw = FIELD_WIDTH  * CELL_SIZE;
     int fh = FIELD_HEIGHT * CELL_SIZE;
@@ -93,81 +138,74 @@ void render_top(const Game *g) {
             draw_sprite6(sx, sy, hspr, PAL_HEAD_NDS);
         } else {
             uint16_t col = snake_segment_color(i, g->snake.length);
-            fb_fill_rect(sx, sy, CELL_SIZE, CELL_SIZE, col);
+            draw_body6(sx, sy, col);
         }
     }
 }
 
-/* ── Bottom screen (libnds text console, 32×24 chars) ─────────────── */
-
-/* ASCII progress bar */
-static void draw_progress(int val, int max, int width) {
-    int filled = (max > 0) ? (val * width / max) : 0;
-    if (filled > width) filled = width;
-    iprintf("[");
-    for (int i = 0; i < width; i++)
-        iprintf("%c", (i < filled) ? '=' : ' ');
-    iprintf("]");
-}
+/* ── Bottom screen (tile-based Unicode text) ──────────────────────── */
 
 void render_bottom(const Game *g) {
-    consoleClear();
+    text_clear();
+    int y = 0;
 
-    /* Console: 32 cols x 24 rows.
-     * Language section is always at rows 20-21.
-     * We count printed lines and pad with blank lines rather than
-     * relying on cursor-position escapes (unreliable when content overflows). */
-
-    iprintf(" %s\n\n", lang_str(STR_TITLE));   /* rows 0-1 */
-    int lines = 2;
+    text_print_row(y, lang_str(STR_TITLE), 0);   y++;
+    y++; /* blank */
 
     if (g->state == STATE_MENU) {
-        iprintf(" %s\n",           lang_str(STR_START));
-        iprintf(" %s\n",           lang_str(STR_ANY_KEY));
-        iprintf("\n");
-        iprintf(" Y: %s\n",        lang_str(STR_AUTOPILOT));
-        iprintf(" L/R: language\n");
-        lines += 5;
+        text_printf_row(y, 0, " %s", lang_str(STR_START));    y++;
+        text_printf_row(y, 0, " %s", lang_str(STR_ANY_KEY));  y++;
+        y++;
+        text_printf_row(y, 0, " Y: %s", lang_str(STR_AUTOPILOT)); y++;
+        text_print_row(y, " L/R: language", 0);                    y++;
     } else if (g->state == STATE_WIN) {
-        iprintf(" %s\n",  lang_str(STR_WIN));
-        iprintf(" %s\n",  lang_str(STR_RESTART));
-        iprintf(" %s\n",  lang_str(STR_ANY_KEY));
-        lines += 3;
+        text_printf_row(y, 0, " %s", lang_str(STR_WIN));      y++;
+        text_printf_row(y, 0, " %s", lang_str(STR_RESTART));  y++;
+        text_printf_row(y, 0, " %s", lang_str(STR_ANY_KEY));  y++;
     } else if (g->state == STATE_LOSE) {
-        iprintf(" %s\n",  lang_str(STR_LOSE));
-        iprintf(" %s\n",  lang_str(STR_RESTART));
-        iprintf(" %s\n",  lang_str(STR_ANY_KEY));
-        lines += 3;
+        text_printf_row(y, 0, " %s", lang_str(STR_LOSE));     y++;
+        text_printf_row(y, 0, " %s", lang_str(STR_RESTART));  y++;
+        text_printf_row(y, 0, " %s", lang_str(STR_ANY_KEY));  y++;
     } else {
         /* PLAYING / PAUSED */
-        iprintf(" %s %d/%d\n", lang_str(STR_SIZE),
-                g->snake.length, WIN_LENGTH);
-        iprintf(" ");
-        draw_progress(g->snake.length, WIN_LENGTH, 20);
-        iprintf("\n");
-        /* Food legend: ANSI color codes — red=31, green=32, reset=0 */
-        iprintf("\n \x1b[31m@\x1b[0m:-5   \x1b[32m@\x1b[0m:+5\n");
-        lines += 4;
+        text_printf_row(y, 0, " %s %d/%d",
+            lang_str(STR_SIZE), g->snake.length, WIN_LENGTH);  y++;
 
-        if (g->state == STATE_PAUSED) {
-            iprintf("\n ** %s **\n", lang_str(STR_PAUSED));
-            lines += 2;
-        } else {
-            iprintf("\n");
-            lines += 1;
+        /* Progress bar */
+        {
+            char bar[32];
+            int filled = (WIN_LENGTH > 0) ? (g->snake.length * 20 / WIN_LENGTH) : 0;
+            if (filled > 20) filled = 20;
+            bar[0] = ' '; bar[1] = '[';
+            for (int i = 0; i < 20; i++) bar[2+i] = (i < filled) ? '=' : ' ';
+            bar[22] = ']'; bar[23] = 0;
+            text_print_row(y, bar, 0);                         y++;
         }
 
-        iprintf(" %s:%s  [Y]\n", lang_str(STR_AUTOPILOT),
-                g->autopilot ? lang_str(STR_ON) : lang_str(STR_OFF));
-        lines += 1;
+        y++; /* blank */
+        /* Food legend: red @:-5  green @:+5 */
+        text_print(1, y, "@", 1);   /* red */
+        text_print(2, y, ":-5   ", 0);
+        text_print(8, y, "@", 2);   /* green */
+        text_print(9, y, ":+5", 0);                           y++;
+
+        if (g->state == STATE_PAUSED) {
+            y++;
+            text_printf_row(y, 0, " ** %s **", lang_str(STR_PAUSED)); y++;
+        } else {
+            y++;
+        }
+
+        text_printf_row(y, 0, " %s:%s  [Y]",
+            lang_str(STR_AUTOPILOT),
+            g->autopilot ? lang_str(STR_ON) : lang_str(STR_OFF));
+        y++;
     }
 
-    /* Pad blank lines to anchor language section at the screen bottom */
-    while (lines < 22) { iprintf("\n"); lines++; }
-
-    /* Row 22: L/R hint; Row 23: language selector */
-    iprintf("   L: prev        R: next\n");
-    iprintf(" < %-24s >\n", LANG_META[lang_get_current()].native_name);
+    /* Row 22-23: language */
+    text_print_row(22, "   L: prev        R: next", 0);
+    text_printf_row(23, 0, " < %-24s >",
+        LANG_META[lang_get_current()].native_name);
 }
 
 /* ── Language auto-detection ───────────────────────────────────────── */

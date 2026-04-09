@@ -15,7 +15,7 @@ int main(void) {
     /* RNG seed */
     srand((unsigned)osGetTime());
 
-    /* Автоопределение языка */
+    /* Auto-detect system language */
     lang_set(lang_detect_system());
 
     static Game g;
@@ -26,7 +26,7 @@ int main(void) {
     while (aptMainLoop()) {
         input_handle_3ds(&g);
 
-        /* Игровой тик */
+        /* Game tick */
         if (g.state == STATE_PLAYING) {
             u64 now = osGetTime();
             if ((u32)(now - last_tick) >= (u32)game_tick_ms(&g)) {

@@ -3,6 +3,7 @@ docs/
 
 # Build directories and intermediate artifacts
 build/
+arm7/
 **/*.elf
 **/*.map
 **/*.lst

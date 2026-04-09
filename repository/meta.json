@@ -4,14 +4,16 @@
       {
         "title": "Snake (3DS)",
         "file": "3ds/snake.3dsx",
-        "icon": "3ds/snake.png"
+        "icon": "3ds/snake.png",
+        "description": "A simple Snake game for the 3DS, developed using C++ and the 3DS homebrew libraries. The game features classic snake gameplay with a modern twist, including power-ups and multiple levels. Players control a snake that grows longer as it eats food, while avoiding collisions with walls and itself. The game is designed to be easy to pick up and play, making it suitable for players of all ages."
       }
     ],
     "nds": [
       {
         "title": "Snake (NDS)",
         "file": "nds/snake.nds",
-        "icon": "nds/snake.png"
+        "icon": "nds/snake.png",
+        "description": "A simple Snake game for the NDS, developed using C++ and the NDS homebrew libraries. The game features classic snake gameplay with a modern twist, including power-ups and multiple levels. Players control a snake that grows longer as it eats food, while avoiding collisions with walls and itself. The game is designed to be easy to pick up and play, making it suitable for players of all ages."
       }
     ]
   }

@@ -28,7 +28,7 @@ void snake_update(Snake *s) {
     s->direction = s->next_direction;
     Point d = DIRS[s->direction];
 
-    /* Сдвигаем сегменты назад, добавляем новую голову */
+    /* Shift segments back, prepend new head */
     for (int i = s->length; i > 0; i--)
         s->segments[i] = s->segments[i - 1];
 
@@ -39,16 +39,16 @@ void snake_update(Snake *s) {
         s->length++;
         s->grow_amount--;
     } else if (s->shrink_amount > 0 && s->length > 1) {
-        /* Убираем два сегмента с хвоста (один за ход роста, один — уменьшение) */
+        /* Remove two tail segments (one for the growth step, one for shrink) */
         if (s->length > 1) s->length--;
         if (s->length > 1) s->length--;
         s->shrink_amount--;
     }
-    /* Если grow/shrink == 0 — хвост не добавляется (уже сдвинули вперёд) */
+    /* If grow/shrink == 0 — tail is not appended (already shifted forward) */
 }
 
 void snake_set_direction(Snake *s, DirIndex d) {
-    /* Запрет разворота на 180° */
+    /* Prevent 180° U-turn */
     Point cur  = DIRS[s->direction];
     Point next = DIRS[d];
     if (cur.x + next.x == 0 && cur.y + next.y == 0) return;

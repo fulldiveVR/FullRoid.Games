@@ -21,5 +21,5 @@ void game_init(Game *g);
 void game_start(Game *g);
 void game_update(Game *g);
 
-/* Возвращает длительность тика в мс для текущей длины змейки */
+/* Returns the tick duration in ms for the current snake length */
 int  game_tick_ms(const Game *g);

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Генерирует lang_strings.c со строками всех 25 языков."""
+"""Generates lang_strings.c with strings for all 25 languages."""
 import os
 
 OUT = os.path.join(os.path.dirname(__file__),
