@@ -6,6 +6,12 @@
         "file": "3ds/snake.3dsx",
         "icon": "3ds/snake.png",
         "description": "A simple Snake game for the 3DS, developed using C++ and the 3DS homebrew libraries. The game features classic snake gameplay with a modern twist, including power-ups and multiple levels. Players control a snake that grows longer as it eats food, while avoiding collisions with walls and itself. The game is designed to be easy to pick up and play, making it suitable for players of all ages."
+      },
+      {
+        "title": "Number Slide (3DS)",
+        "file": "3ds/numberslide.3dsx",
+        "icon": "3ds/numberslide.png",
+        "description": "A 2048 clone for the 3DS, developed using C++ and the 3DS homebrew libraries. Players slide numbered tiles on a 4x4 grid, merging matching numbers to reach the 2048 tile. The game features smooth touch controls, score tracking, and addictive gameplay. Simple to learn but challenging to master."
       }
     ],
     "nds": [
@@ -14,6 +20,12 @@
         "file": "nds/snake.nds",
         "icon": "nds/snake.png",
         "description": "A simple Snake game for the NDS, developed using C++ and the NDS homebrew libraries. The game features classic snake gameplay with a modern twist, including power-ups and multiple levels. Players control a snake that grows longer as it eats food, while avoiding collisions with walls and itself. The game is designed to be easy to pick up and play, making it suitable for players of all ages."
+      },
+      {
+        "title": "Number Slide (NDS)",
+        "file": "nds/numberslide.nds",
+        "icon": "nds/numberslide.png",
+        "description": "A 2048 clone for the NDS, developed using C++ and the NDS homebrew libraries. Players slide numbered tiles on a 4x4 grid, merging matching numbers to reach the 2048 tile. The game features smooth touch controls, score tracking, and addictive gameplay. Simple to learn but challenging to master."
       }
     ]
   }

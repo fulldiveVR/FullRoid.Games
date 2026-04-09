@@ -1,20 +1,22 @@
 # Free Games Catalog
 
-A collection of free, open-source games for handheld consoles. No proprietary
-libraries — every dependency is open-source and can be verified below.
+A collection of free, open-source games for the
+[FullRoid](https://play.google.com/store/apps/details?id=com.fulldive.extension.fullroid) emulator. No proprietary libraries — every
+dependency is open-source and can be verified below.
 
 ## Games
 
 | Game | Platforms | Description |
 |------|-----------|-------------|
 | [Snake](snake/) | DS, 3DS | Classic snake with 25 language UI, volumetric pixel-art sprites, autopilot mode |
+| [Number Slide](numberslide/) | DS, 3DS | 2048 clone — slide and merge tiles to reach 2048 |
 
 ## Platforms
 
 | Platform | Notes |
 |----------|-------|
-| DS | `.nds` ROM, runs on hardware via flashcart or TWiLight Menu++ |
-| 3DS | `.3dsx` homebrew, runs via Homebrew Launcher or Luma3DS |
+| DS | `.nds` ROM for FullRoid DS emulation |
+| 3DS | `.3dsx` homebrew for FullRoid 3DS emulation |
 
 Prebuilt ROMs are in [`repository/`](repository/).
 
@@ -39,8 +41,8 @@ cd snake
 ./build.sh
 ```
 
-The first run builds the `snake-devkit` Docker image automatically. Subsequent
-runs are fast. Output is placed in `repository/nds/` and `repository/3ds/`.
+The first run builds the Docker image automatically. Subsequent runs are fast.
+Output is placed in `repository/nds/` and `repository/3ds/`.
 
 To build a single platform:
 
