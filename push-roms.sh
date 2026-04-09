@@ -3,11 +3,15 @@
 # push-roms.sh — Push ROM files to Documents/Roms on a connected Android device.
 #
 # Usage:
-#   ./push-roms.sh <file_or_dir> [file_or_dir ...]
+#   ./push-roms.sh [-s suffix] <file_or_dir> [file_or_dir ...]
+#
+# Options:
+#   -s suffix   Append suffix to filename before extension
 #
 # Examples:
-#   ./push-roms.sh game.zip
-#   ./push-roms.sh ~/Downloads/*.nes
+#   ./push-roms.sh game.zip                    → game.zip
+#   ./push-roms.sh -s _v2 game.nds             → game_v2.nds
+#   ./push-roms.sh -s _debug ~/Downloads/*.nes
 #   ./push-roms.sh roms/
 
 set -euo pipefail
@@ -18,7 +22,14 @@ die() { echo "error: $*" >&2; exit 1; }
 
 command -v adb &>/dev/null || die "adb not found — add Android SDK platform-tools to PATH"
 
-[[ $# -gt 0 ]] || { echo "Usage: $(basename "$0") <file_or_dir> [...]" >&2; exit 1; }
+SUFFIX=""
+if [[ "${1:-}" == "-s" ]]; then
+    [[ $# -ge 2 ]] || die "-s requires a suffix argument"
+    SUFFIX="$2"
+    shift 2
+fi
+
+[[ $# -gt 0 ]] || { echo "Usage: $(basename "$0") [-s suffix] <file_or_dir> [...]" >&2; exit 1; }
 
 # Check device is connected
 DEVICES=$(adb devices | awk 'NR>1 && /\tdevice$/ {print $1}')
@@ -47,6 +58,16 @@ push_file() {
     local src="$1"
     local filename
     filename="$(basename "$src")"
+    if [[ -n "$SUFFIX" ]]; then
+        local name="${filename%.*}"
+        local ext="${filename##*.}"
+        if [[ "$name" == "$ext" ]]; then
+            # No extension
+            filename="${name}${SUFFIX}"
+        else
+            filename="${name}${SUFFIX}.${ext}"
+        fi
+    fi
     echo "  pushing: $filename"
     if $ADB push "$src" "$DEVICE_DEST/$filename"; then
         (( PUSHED++ )) || true
