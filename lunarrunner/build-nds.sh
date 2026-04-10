@@ -5,7 +5,7 @@ REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 JOBS=$(sysctl -n hw.logicalcpu 2>/dev/null || nproc 2>/dev/null || echo 4)
 
-echo "==> Building Lunar Runner for Nintendo DS..."
+echo "==> Building Lunar Runner for DS..."
 
 docker run --rm \
   -v "$REPO_ROOT:/project" \

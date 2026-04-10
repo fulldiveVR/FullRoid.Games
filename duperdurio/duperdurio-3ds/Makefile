@@ -9,19 +9,17 @@ include $(DEVKITARM)/3ds_rules
 LD := $(CC)
 
 #---------------------------------------------------------------------------------
-TARGET      := lunarrunner
+TARGET      := duperdurio
 BUILD       := build
 SOURCES     := source \
-               ../lunarrunner-common \
-               ../lunarrunner-common/i18n \
-               ../lunarrunner-common/sprites
+               ../duperdurio-common \
+               ../duperdurio-common/sprites
 INCLUDES    := source \
-               ../lunarrunner-common \
-               ../lunarrunner-common/i18n \
-               ../lunarrunner-common/sprites
-APP_TITLE   := LunarRunner
-APP_DESCRIPTION := Lunar Runner for 3DS
-APP_AUTHOR  := LunarRunner Port
+               ../duperdurio-common \
+               ../duperdurio-common/sprites
+APP_TITLE   := DuperDurio
+APP_DESCRIPTION := Classic Super Durio for 3DS
+APP_AUTHOR  := DuperDurio Port
 #---------------------------------------------------------------------------------
 
 ARCH     := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft

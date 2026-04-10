@@ -14,5 +14,7 @@ snake/snake-nds/*.nds
 snake/snake-3ds/*.3dsx
 numberslide/numberslide-nds/*.nds
 numberslide/numberslide-3ds/*.3dsx
+duperdurio/duperdurio-3ds/*.3dsx
 # macOS metadata
 .DS_Store
+dudequest

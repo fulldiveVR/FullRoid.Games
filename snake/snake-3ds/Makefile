@@ -21,7 +21,7 @@ INCLUDES    := source \
                ../snake-common/i18n \
                ../snake-common/sprites
 APP_TITLE   := Snake
-APP_DESCRIPTION := Snake for Nintendo 3DS
+APP_DESCRIPTION := Snake for 3DS
 APP_AUTHOR  := Snake Port
 #---------------------------------------------------------------------------------
 

@@ -20,7 +20,7 @@ INCLUDES    := source \
                ../numberslide-common/i18n \
                ../numberslide-common/sprites
 APP_TITLE   := NumberSlide
-APP_DESCRIPTION := NumberSlide for Nintendo 3DS
+APP_DESCRIPTION := NumberSlide for 3DS
 APP_AUTHOR  := NumberSlide Port
 #---------------------------------------------------------------------------------
 
