@@ -5,6 +5,7 @@
 
 #define DEAD_WAIT_MS    1500   /* ms after death before restart prompt */
 #define CAM_DURIO_X     80     /* where Durio sits horizontally on screen */
+#define CAM_TOP_MARGIN  20     /* px from screen top before the camera scrolls up to follow */
 
 /* ─────────────────────────────────────────────────────────────
  * Enemy spawning for one buffer block
@@ -145,11 +146,30 @@ static void update_camera(Game *g) {
         if (g->durio.vx_fp < 0) g->durio.vx_fp = 0;
     }
 
-    /* Camera follows player */
+    /* Camera follows player horizontally */
     int durio_wx = FP_TO_INT(g->durio.x_fp);
     int target   = durio_wx - CAM_DURIO_X;
     if (target < 0) target = 0;
     g->level.cam_x = target;
+
+    /* Camera vertical: anchor the ground at the BOTTOM of the screen by default
+       (cam_y = max_cam_y), matching the classic fixed view. Only scroll up when
+       the player climbs near the top of the view (tall platforms) — this keeps
+       normal jumps from dragging the camera and "sticking" the player mid-air.
+       When the level is no taller than the screen (max_cam_y == 0) cam_y stays 0. */
+    int level_px_h = LEVEL_MAX_H * TILE_PX;
+    int max_cam_y  = level_px_h - SCREEN_H;
+    if (max_cam_y < 0) max_cam_y = 0;
+
+    int durio_wy = FP_TO_INT(g->durio.y_fp);
+    int vtarget  = max_cam_y;                        /* default: ground at bottom */
+    if (durio_wy - vtarget < CAM_TOP_MARGIN)         /* player near top of view? */
+        vtarget = durio_wy - CAM_TOP_MARGIN;         /* scroll up to keep him on-screen */
+    if (vtarget < 0)          vtarget = 0;
+    if (vtarget > max_cam_y)  vtarget = max_cam_y;
+
+    int diff = vtarget - g->level.cam_y;             /* ease toward target */
+    g->level.cam_y += (diff > -4 && diff < 4) ? diff : diff / 4;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -162,7 +182,7 @@ static void check_durio_enemy(Game *g) {
     for (int i = 0; i < MAX_ENEMIES; i++) {
         Enemy *e = &g->enemies[i];
         if (e->type == ENEMY_NONE || e->status == ENEMY_DEAD) continue;
-        if (e->status == ENEMY_SQUISHED) continue;
+        if (e->status == ENEMY_SQUISHED || e->status == ENEMY_SHELL) continue;
 
         Rect er = enemy_hitbox(e);
         if (!rect_overlap(&mr, &er)) continue;
@@ -170,22 +190,93 @@ static void check_durio_enemy(Game *g) {
         int durio_foot = FP_TO_INT(g->durio.y_fp) + durio_height(&g->durio);
         int enemy_top  = FP_TO_INT(e->y_fp);
 
-        if (durio_foot <= enemy_top + 8 && g->durio.vy_fp > 0) {
+        if (durio_foot <= enemy_top + TILE_PX/2 && g->durio.vy_fp > 0) {
             /* Stomp */
-            g->durio.vy_fp = INT_TO_FP(-260);
+            g->durio.vy_fp = INT_TO_FP(-390);
             g->durio.score += (e->type == ENEMY_CRAB) ? SCORE_CRAB : SCORE_SNAIL;
 
             if (e->type == ENEMY_CRAB) {
                 e->status       = ENEMY_SQUISHED;
                 e->squish_timer = 300;
             } else {
-                int shell_tx = FP_TO_INT(e->x_fp) / TILE_PX;
-                int shell_ty = FP_TO_INT(e->y_fp) / TILE_PX;
-                level_set_tile(&g->level, shell_tx, shell_ty, TILE_SHELL);
-                e->status = ENEMY_DEAD;
+                /* Snail: leave a static shell at the exact kill position
+                   (an entity, not a grid-snapped tile). */
+                e->status = ENEMY_SHELL;
+                e->vx_fp  = 0;
+                e->vy_fp  = 0;
             }
         } else {
             durio_kill(&g->durio);
+        }
+    }
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Shell solidity (shells are static entities at the exact kill spot)
+ * ───────────────────────────────────────────────────────────── */
+
+/* Push Durio out of any shell along the least-penetration axis. Runs AFTER
+   durio physics so the resolved position is final (no sink-then-push jitter). */
+static void check_durio_shells(Game *g) {
+    if (g->durio.state == DURIO_DEAD) return;
+    int h = durio_height(&g->durio);
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        Enemy *e = &g->enemies[i];
+        if (e->type == ENEMY_NONE || e->status != ENEMY_SHELL) continue;
+        Rect sr = enemy_hitbox(e);
+        Rect mr = durio_hitbox(&g->durio);
+
+        /* Need horizontal overlap to interact at all. */
+        if (mr.x + mr.w <= sr.x || mr.x >= sr.x + sr.w) continue;
+
+        int feet = FP_TO_INT(g->durio.y_fp) + h;
+
+        /* Land on top: feet at/just past the shell top (3px tolerance so the snap
+           fires while resting, before sub-pixel gravity sinks it → no jitter),
+           player above the shell's middle, and moving down/resting. */
+        if (g->durio.vy_fp >= 0 && feet >= sr.y - 3 && feet <= sr.y + sr.h/2) {
+            g->durio.y_fp      = INT_TO_FP(sr.y - h);
+            g->durio.vy_fp     = 0;
+            g->durio.on_ground = 1;
+            g->durio.coyote_ms = 100;
+            continue;
+        }
+
+        /* Otherwise, if genuinely overlapping, push out sideways / from below. */
+        if (!rect_overlap(&mr, &sr)) continue;
+        int pcx = mr.x + mr.w/2, scx = sr.x + sr.w/2;
+        if (feet < sr.y + sr.h && g->durio.vy_fp < 0
+            && mr.y <= sr.y + sr.h && mr.y >= sr.y) {   /* head bonk from below */
+            g->durio.y_fp  = INT_TO_FP(sr.y + sr.h - DURIO_HIT_INSET_TOP);
+            g->durio.vy_fp = 0;
+        } else {                                        /* wall */
+            if (pcx < scx) g->durio.x_fp = INT_TO_FP(sr.x - DURIO_W + DURIO_HIT_INSET_X);
+            else           g->durio.x_fp = INT_TO_FP(sr.x + sr.w - DURIO_HIT_INSET_X);
+            g->durio.vx_fp = 0;
+        }
+    }
+}
+
+/* Enemies treat shells as walls: reverse direction on contact. */
+static void check_enemy_shells(Game *g) {
+    for (int i = 0; i < MAX_ENEMIES; i++) {
+        Enemy *e = &g->enemies[i];
+        if (e->type == ENEMY_NONE || e->status != ENEMY_ALIVE) continue;
+        Rect er = enemy_hitbox(e);
+        for (int j = 0; j < MAX_ENEMIES; j++) {
+            if (j == i) continue;
+            Enemy *s = &g->enemies[j];
+            if (s->status != ENEMY_SHELL) continue;
+            Rect sr = enemy_hitbox(s);
+            if (!rect_overlap(&er, &sr)) continue;
+            /* push out horizontally and reverse away from the shell */
+            if (er.x + er.w/2 < sr.x + sr.w/2) {
+                e->x_fp  = INT_TO_FP(sr.x - ENEMY_W);
+                e->vx_fp = -ENEMY_SPEED;   /* move left */
+            } else {
+                e->x_fp  = INT_TO_FP(sr.x + sr.w);
+                e->vx_fp = ENEMY_SPEED;    /* move right */
+            }
         }
     }
 }
@@ -239,7 +330,7 @@ static void spawn_nut_from_block(Game *g, int tx, int ty) {
     for (int i = 0; i < MAX_NUTS; i++) {
         if (!g->nuts[i].active) {
             nut_spawn(&g->nuts[i],
-                       tx * TILE_PX + 8,
+                       tx * TILE_PX,
                        ty * TILE_PX - TILE_PX,
                        1);
             return;
@@ -277,6 +368,7 @@ void game_tick(Game *g, int delta_ms) {
         if (g->enemies[i].type == ENEMY_NONE) continue;
         enemy_update(&g->enemies[i], &g->level, delta_ms);
     }
+    check_enemy_shells(g);   /* enemies bounce off shells like walls */
 
     /* ── Update nuts ── */
     for (int i = 0; i < MAX_NUTS; i++)
@@ -327,6 +419,7 @@ void game_input(Game *g, int left, int right, int run,
         if (pause) { g->state = GAME_PAUSED; return; }
         durio_update(&g->durio, &g->level,
                      left, right, run, jump_down, jump_held, delta_ms);
+        check_durio_shells(g);   /* solid shells, resolved after physics */
         if (g->durio.pending_coin_tx >= 0) {
             spawn_nut_from_block(g, g->durio.pending_coin_tx,
                                      g->durio.pending_coin_ty);

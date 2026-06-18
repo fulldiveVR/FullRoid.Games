@@ -1,0 +1,170 @@
+{
+  "$comment": "Sprite generation manifest for DuperDurio. Consumed by tools/gen_sprites.py. Each entry maps to a SPR_* index in sprite_data.h. Frames are generated via Replicate (recraft-v3 / pixel_art), background-removed, trimmed, and downscaled to `store_px` before being packed into the citro2d atlas. Order of `sprites` MUST match the SPR_* numeric defines so the .t3s sub-image indices line up.",
+  "model": "recraft-ai/recraft-v3",
+  "model_inputs": {
+    "style": "digital_illustration/pixel_art",
+    "size": "1024x1024"
+  },
+  "style_preamble": "single game sprite, centered, full body in frame, side-view 2/3 platformer perspective, modern detailed pixel art, crisp clean pixel clusters, bold readable silhouette, dark 1px outline, rich shading with 3-4 tone ramps, vibrant saturated colors, sci-fi alien planet theme, cohesive cohesive palette of deep purples teal-cyan and warm orange accents, plain flat solid white background, no text, no shadow on ground, no border, no frame",
+  "defaults": {
+    "store_px": 64
+  },
+  "sprites": [
+    {
+      "id": "SPR_DURIO_SMALL_STAND",
+      "name": "durio_stand",
+      "store_px": 64,
+      "prompt": "a cute brave little alien space explorer mascot character standing idle facing right, round glossy cyan dome space helmet with a dark tinted visor and a tiny yellow antenna with a glowing ball on top, purple armored spacesuit body, chunky orange rocket boots, arms relaxed at sides"
+    },
+    {
+      "id": "SPR_DURIO_SMALL_WALK0",
+      "name": "durio_walk0",
+      "store_px": 64,
+      "prompt": "the same cute alien space explorer mascot walking, mid-stride pose with one orange rocket boot forward and one back, round cyan dome helmet with dark visor and yellow antenna, purple armored spacesuit, facing right"
+    },
+    {
+      "id": "SPR_DURIO_SMALL_WALK1",
+      "name": "durio_walk1",
+      "store_px": 64,
+      "prompt": "the same cute alien space explorer mascot walking, neutral contact pose with legs together and slight bounce, round cyan dome helmet with dark visor and yellow antenna, purple armored spacesuit, orange rocket boots, facing right"
+    },
+    {
+      "id": "SPR_DURIO_SMALL_WALK2",
+      "name": "durio_walk2",
+      "store_px": 64,
+      "prompt": "the same cute alien space explorer mascot walking, opposite mid-stride pose with the other orange rocket boot forward, round cyan dome helmet with dark visor and yellow antenna, purple armored spacesuit, facing right"
+    },
+    {
+      "id": "SPR_DURIO_SMALL_JUMP",
+      "name": "durio_jump",
+      "store_px": 64,
+      "prompt": "the same cute alien space explorer mascot jumping upward, legs tucked and arms slightly raised, small flame bursts from the orange rocket boots, round cyan dome helmet with dark visor and yellow antenna, purple armored spacesuit, facing right"
+    },
+    {
+      "id": "SPR_DURIO_DEAD",
+      "name": "durio_dead",
+      "store_px": 64,
+      "prompt": "the cute alien space explorer mascot defeated, knocked over on its back with cracked dim cyan helmet, antenna drooping, x-shaped dizzy eyes on the visor, small spark, facing up"
+    },
+    {
+      "id": "SPR_CRAB_WALK0",
+      "name": "crab_walk0",
+      "store_px": 64,
+      "prompt": "a hostile dark crimson red alien space crab enemy creature, wide squat armored shell, two big menacing pincer claws raised, glowing white eyes, spiky legs, side view facing left, legs in one walking pose"
+    },
+    {
+      "id": "SPR_CRAB_WALK1",
+      "name": "crab_walk1",
+      "store_px": 64,
+      "prompt": "the same hostile dark crimson red alien space crab enemy, wide armored shell, two pincer claws, glowing white eyes, spiky legs in the opposite walking pose, side view facing left"
+    },
+    {
+      "id": "SPR_SNAIL_WALK0",
+      "name": "snail_walk0",
+      "store_px": 64,
+      "prompt": "a slow alien space snail enemy with a large tan-gold domed spiral shell with dark brown spiral, olive green slug body, two short eye-stalk tentacles in front, side view facing left, body extended pose"
+    },
+    {
+      "id": "SPR_SNAIL_WALK1",
+      "name": "snail_walk1",
+      "store_px": 64,
+      "prompt": "the same alien space snail enemy, large tan-gold spiral shell, olive green slug body slightly contracted, two short eye-stalk tentacles, side view facing left"
+    },
+    {
+      "id": "SPR_SNAIL_SHELL",
+      "name": "snail_shell",
+      "store_px": 64,
+      "prompt": "just the empty tan-gold domed spiral alien snail shell sitting on the ground, dark brown spiral swirl, no body, smooth glossy, side view"
+    },
+    {
+      "id": "SPR_NUT_0",
+      "name": "nut_0",
+      "store_px": 48,
+      "prompt": "a shiny metallic silver-gray hexagonal nut bolt collectible item with a dark hole in the center, glinting highlight, front face view, like a coin pickup"
+    },
+    {
+      "id": "SPR_TILE_GROUND",
+      "name": "tile_ground",
+      "store_px": 64,
+      "tile": true,
+      "prompt": "a seamless tileable rock texture, alien rocky planet stone, cool blue-gray and slate cracked stone, subtle mineral cracks and pebbles, flat even top-down lighting, NO plants, NO grass, NO moss, NO green, fills the entire frame edge to edge with no border and no margin"
+    },
+    {
+      "id": "SPR_TILE_BRICK",
+      "name": "tile_brick",
+      "store_px": 64,
+      "tile": true,
+      "prompt": "a seamless square metal panel block tile, brushed steel sci-fi plating with beveled edges and four corner rivets, light top-left bevel and dark bottom-right shadow, fills the whole square edge to edge"
+    },
+    {
+      "id": "SPR_TILE_QBLOCK",
+      "name": "tile_qblock",
+      "store_px": 64,
+      "tile": true,
+      "prompt": "a square sci-fi supply crate block tile, dark metal hull with a bright glowing teal-cyan energy border outline, a silver hex-nut bolt icon glowing in the center, fills the whole square edge to edge"
+    },
+    {
+      "id": "SPR_TILE_QBLOCK_USED",
+      "name": "tile_qblock_used",
+      "store_px": 64,
+      "tile": true,
+      "prompt": "a square depleted sci-fi supply crate block tile, dim dark metal hull, faint gray outline, no glow, empty and inert, fills the whole square edge to edge"
+    },
+    {
+      "id": "SPR_TILE_PIPE_TOP",
+      "name": "tile_pipe_top",
+      "store_px": 64,
+      "tile": true,
+      "prompt": "the top cap segment of an ancient alien stone totem pillar, dark basalt stone with a lighter top rim overhang, a glowing orange carved eye rune in the center, square tile, fills the whole square"
+    },
+    {
+      "id": "SPR_TILE_PIPE_BODY",
+      "name": "tile_pipe_body",
+      "store_px": 64,
+      "tile": true,
+      "prompt": "the body segment of an ancient alien stone totem pillar, dark basalt stone with lighter edge highlights and a horizontal glowing orange rune stripe, square tile, fills the whole square edge to edge"
+    },
+    {
+      "id": "SPR_BG_PLANET2",
+      "name": "bg_planet2",
+      "store_px": 96,
+      "bg": true,
+      "prompt": "a distant ringed gas giant planet, soft banded purple magenta and indigo, a thin pale glowing ring tilted across it, smooth simple shapes, no text, on a plain solid white background"
+    },
+    {
+      "id": "SPR_BG_NEBULA",
+      "name": "bg_nebula",
+      "store_px": 128,
+      "bg": true,
+      "prompt": "a soft wispy space nebula cloud, glowing teal cyan and violet gas, faint translucent edges, no stars, no text, on a plain solid white background"
+    },
+    {
+      "id": "SPR_BG_MOON",
+      "name": "bg_moon",
+      "store_px": 56,
+      "bg": true,
+      "prompt": "a small distant cratered moon, pale blue-gray with subtle craters, smooth, no text, on a plain solid white background"
+    },
+    {
+      "id": "SPR_BG_WRECK",
+      "name": "bg_wreck",
+      "store_px": 96,
+      "bg": true,
+      "prompt": "a crashed alien exploration pod wreck resting on the ground, dented round cockpit dome half-buried, dark gray-teal metal hull with a faded orange stripe, broken panels, muted desaturated distant colors, no text, on a plain solid white background"
+    },
+    {
+      "id": "SPR_BG_DEBRIS",
+      "name": "bg_debris",
+      "store_px": 96,
+      "bg": true,
+      "prompt": "wreckage of a crashed metal space vehicle on the ground: gray and blue-gray riveted steel hull plates, a broken black rubber wheel, a snapped antenna, scattered metal scrap and bolts. industrial machine debris, NOT organic, NOT pink, NOT a creature. muted desaturated gray metal, no text, on a plain solid white background"
+    },
+    {
+      "id": "SPR_BG_RIG",
+      "name": "bg_rig",
+      "store_px": 96,
+      "bg": true,
+      "prompt": "an abandoned alien mining rig on the ground, a tilted broken satellite dish on a metal frame tower, dark weathered metal, muted desaturated distant colors, no text, on a plain solid white background"
+    }
+  ]
+}

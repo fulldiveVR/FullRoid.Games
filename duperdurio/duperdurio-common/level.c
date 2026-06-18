@@ -6,6 +6,7 @@ void level_init(Level *lvl, uint8_t *tiles, int width, int height) {
     lvl->width           = width;
     lvl->height          = height;
     lvl->cam_x           = 0;
+    lvl->cam_y           = 0;
     lvl->base_block_idx  = 0;
 }
 

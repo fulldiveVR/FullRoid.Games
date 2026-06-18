@@ -31,12 +31,15 @@ void enemy_update(Enemy *e, const Level *lvl, int delta_ms) {
         return;
     }
 
+    /* Shell: static, stays exactly where the snail was stomped (no grid snap) */
+    if (e->status == ENEMY_SHELL) return;
+
     /* ── Gravity ── */
-    e->vy_fp += FP_MUL(GRAVITY, INT_TO_FP(delta_ms)) / 1000;
-    if (e->vy_fp > INT_TO_FP(400)) e->vy_fp = INT_TO_FP(400);
+    e->vy_fp += FP_STEP(GRAVITY, delta_ms);
+    if (e->vy_fp > INT_TO_FP(600)) e->vy_fp = INT_TO_FP(600);
 
     /* ── Move X ── */
-    e->x_fp += FP_MUL(e->vx_fp, INT_TO_FP(delta_ms)) / 1000;
+    e->x_fp += FP_STEP(e->vx_fp, delta_ms);
     {
         int wx = FP_TO_INT(e->x_fp);
         int wy = FP_TO_INT(e->y_fp);
@@ -51,7 +54,7 @@ void enemy_update(Enemy *e, const Level *lvl, int delta_ms) {
     }
 
     /* ── Move Y ── */
-    e->y_fp += FP_MUL(e->vy_fp, INT_TO_FP(delta_ms)) / 1000;
+    e->y_fp += FP_STEP(e->vy_fp, delta_ms);
     e->on_ground = 0;
     {
         int wx = FP_TO_INT(e->x_fp);
@@ -85,7 +88,7 @@ void enemy_update(Enemy *e, const Level *lvl, int delta_ms) {
             e->vx_fp = -ENEMY_SPEED;
     }
 
-    /* Fall out of world */
-    if (FP_TO_INT(e->y_fp) > SCREEN_H + 64)
+    /* Fall out of world (world is LEVEL_MAX_H tiles tall, not one screen) */
+    if (FP_TO_INT(e->y_fp) > LEVEL_MAX_H * TILE_PX + 64)
         e->status = ENEMY_DEAD;
 }

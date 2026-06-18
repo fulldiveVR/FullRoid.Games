@@ -32,14 +32,14 @@ static void pat_pit(Pattern *p, int c0, int c1) {
     }
 }
 
-/* Pipe: height tiles tall, 2 tiles wide starting at col.
-   top row = (13 - height), body fills down to row 13.
-   Nuts (if nut_above != 0) placed one row above the pipe top. */
+/* Totem: stands ON the ground (rows 13-14 stay solid ground), bottom at row 12
+   so the ground surface stays continuous and doesn't drop a row under it.
+   top row = (13 - height); body fills down to row 12. */
 static void pat_pipe(Pattern *p, int col, int height) {
     int top_row = 13 - height;
     pat_set(p, top_row,     col,     TILE_PIPE_TOP);
     pat_set(p, top_row,     col + 1, TILE_PIPE_TOP);
-    for (int r = top_row + 1; r <= 13; r++) {
+    for (int r = top_row + 1; r <= 12; r++) {
         pat_set(p, r, col,     TILE_PIPE_BODY);
         pat_set(p, r, col + 1, TILE_PIPE_BODY);
     }

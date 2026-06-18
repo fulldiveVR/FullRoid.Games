@@ -1,11 +1,11 @@
 #include "durio.h"
 #include <stddef.h>
 
-#define DURIO_START_X    48
+#define DURIO_START_X    (3 * TILE_PX)  /* 3 tiles in */
 #define DURIO_START_ROW  12   /* tile row (ground row - 1) */
 
 #define WALK_FRAME_MS    120  /* ms per walk animation frame */
-#define DEATH_FLY_VY    INT_TO_FP(-600)
+#define DEATH_FLY_VY    INT_TO_FP(-900)
 
 void durio_init(Durio *m) {
     m->x_fp         = INT_TO_FP(DURIO_START_X);
@@ -87,8 +87,8 @@ void durio_update(Durio *m, Level *lvl,
         if (m->dead_timer >= 300) {
             if (m->dead_timer - delta_ms < 300)
                 m->vy_fp = DEATH_FLY_VY;   /* set once on transition */
-            m->vy_fp += FP_MUL(GRAVITY, INT_TO_FP(delta_ms)) / 1000;
-            m->y_fp  += FP_MUL(m->vy_fp,  INT_TO_FP(delta_ms)) / 1000;
+            m->vy_fp += FP_STEP(GRAVITY, delta_ms);
+            m->y_fp  += FP_STEP(m->vy_fp, delta_ms);
         }
         return;
     }
@@ -116,19 +116,19 @@ void durio_update(Durio *m, Level *lvl,
     if (inp_left && !inp_right) {
         m->dir = DURIO_FACE_LEFT;
         if (m->vx_fp > -target_spd) {
-            m->vx_fp -= INT_TO_FP(12);
+            m->vx_fp -= INT_TO_FP(18);
             if (m->vx_fp < -target_spd) m->vx_fp = -target_spd;
         }
     } else if (inp_right && !inp_left) {
         m->dir = DURIO_FACE_RIGHT;
         if (m->vx_fp < target_spd) {
-            m->vx_fp += INT_TO_FP(12);
+            m->vx_fp += INT_TO_FP(18);
             if (m->vx_fp > target_spd) m->vx_fp = target_spd;
         }
     } else {
         /* Decelerate */
-        if (m->vx_fp > INT_TO_FP(8))       m->vx_fp -= INT_TO_FP(8);
-        else if (m->vx_fp < -INT_TO_FP(8)) m->vx_fp += INT_TO_FP(8);
+        if (m->vx_fp > INT_TO_FP(12))       m->vx_fp -= INT_TO_FP(12);
+        else if (m->vx_fp < -INT_TO_FP(12)) m->vx_fp += INT_TO_FP(12);
         else                                m->vx_fp = 0;
     }
 
@@ -145,18 +145,18 @@ void durio_update(Durio *m, Level *lvl,
     if (m->jump_held) {
         if (inp_jump_held && m->jump_held_ms < JUMP_HOLD_MIN) {
             m->jump_held_ms += delta_ms;
-            m->vy_fp -= INT_TO_FP(6);
+            m->vy_fp -= INT_TO_FP(9);
         } else {
             m->jump_held = 0;
         }
     }
 
     /* ── Gravity ── */
-    m->vy_fp += FP_MUL(GRAVITY, INT_TO_FP(delta_ms)) / 1000;
-    if (m->vy_fp > INT_TO_FP(400)) m->vy_fp = INT_TO_FP(400);
+    m->vy_fp += FP_STEP(GRAVITY, delta_ms);
+    if (m->vy_fp > INT_TO_FP(600)) m->vy_fp = INT_TO_FP(600);
 
     /* ── Move X, resolve X collisions (hitbox insets) ── */
-    m->x_fp += FP_MUL(m->vx_fp, INT_TO_FP(delta_ms)) / 1000;
+    m->x_fp += FP_STEP(m->vx_fp, delta_ms);
     {
         int wx = FP_TO_INT(m->x_fp);
         int wy = FP_TO_INT(m->y_fp);
@@ -168,17 +168,20 @@ void durio_update(Durio *m, Level *lvl,
                                h - DURIO_HIT_INSET_TOP - DURIO_HIT_INSET_BOT,
                                &hit_tx, &hit_ty)) {
             int tile_px_x = hit_tx * TILE_PX;
+            /* Resolve against the INSET hitbox edge (collision uses the inset
+               box) — using the full width left a 1-inset gap and the player
+               re-entered the wall every frame, causing a jitter. */
             if (m->vx_fp > 0)
-                m->x_fp = INT_TO_FP(tile_px_x - DURIO_W);
+                m->x_fp = INT_TO_FP(tile_px_x - DURIO_W + DURIO_HIT_INSET_X);
             else
-                m->x_fp = INT_TO_FP(tile_px_x + TILE_PX);
+                m->x_fp = INT_TO_FP(tile_px_x + TILE_PX - DURIO_HIT_INSET_X);
             m->vx_fp = 0;
         }
         if (m->x_fp < 0) { m->x_fp = 0; m->vx_fp = 0; }
     }
 
     /* ── Move Y, resolve Y collisions ── */
-    m->y_fp += FP_MUL(m->vy_fp, INT_TO_FP(delta_ms)) / 1000;
+    m->y_fp += FP_STEP(m->vy_fp, delta_ms);
     m->on_ground = 0;
     {
         int wx  = FP_TO_INT(m->x_fp);
@@ -213,8 +216,8 @@ void durio_update(Durio *m, Level *lvl,
         }
     }
 
-    /* Fall out of world = die */
-    if (FP_TO_INT(m->y_fp) > SCREEN_H + 64)
+    /* Fall out of world = die (world is LEVEL_MAX_H tiles tall, not one screen) */
+    if (FP_TO_INT(m->y_fp) > LEVEL_MAX_H * TILE_PX + 64)
         durio_kill(m);
 
     /* ── Walk animation ── */

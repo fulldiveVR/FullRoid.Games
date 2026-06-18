@@ -1,0 +1,20 @@
+-f rgba -z auto
+--atlas
+../../duperdurio-common/sprites/processed/durio_stand.png
+../../duperdurio-common/sprites/processed/durio_walk0.png
+../../duperdurio-common/sprites/processed/durio_walk1.png
+../../duperdurio-common/sprites/processed/durio_walk2.png
+../../duperdurio-common/sprites/processed/durio_jump.png
+../../duperdurio-common/sprites/processed/durio_dead.png
+../../duperdurio-common/sprites/processed/crab_walk0.png
+../../duperdurio-common/sprites/processed/crab_walk1.png
+../../duperdurio-common/sprites/processed/snail_walk0.png
+../../duperdurio-common/sprites/processed/snail_walk1.png
+../../duperdurio-common/sprites/processed/snail_shell.png
+../../duperdurio-common/sprites/processed/nut_0.png
+../../duperdurio-common/sprites/processed/bg_planet2.png
+../../duperdurio-common/sprites/processed/bg_nebula.png
+../../duperdurio-common/sprites/processed/bg_moon.png
+../../duperdurio-common/sprites/processed/bg_wreck.png
+../../duperdurio-common/sprites/processed/bg_debris.png
+../../duperdurio-common/sprites/processed/bg_rig.png

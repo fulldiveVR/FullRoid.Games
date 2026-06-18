@@ -2,14 +2,73 @@
 #include "../../duperdurio-common/font.h"
 #include "../../duperdurio-common/config.h"
 #include "../../duperdurio-common/level.h"
+#include "../../duperdurio-common/sprites/sprite_atlas.h"
 #include <stdio.h>
 #include <string.h>
 
 /*
  * 3DS renderer using citro2d.
- * All game objects drawn as colored rectangles — no external textures.
+ *
+ * Entities (Durio, enemies, collectible nuts) are drawn from an AI-generated
+ * sprite atlas (romfs:/gfx/sprites.t3x, built by tools/gen_sprites.py + tex3ds).
+ * Tiles and the parallax background stay procedural (colored rectangles): AI
+ * can't make seamless edge-to-edge block fills, and the hand-built tiles tile
+ * perfectly and match the theme.
+ *
+ * If the atlas fails to load (g_sheet == NULL) every entity falls back to its
+ * original rectangle drawing, so the build is never visually broken.
+ *
  * citro2d cap: ~4096 draw calls/frame; this stays well under 400.
  */
+
+/* Compiled-in sprite atlas; NULL until loaded (or if loading fails). */
+static C2D_SpriteSheet g_sheet = NULL;
+
+/* DEBUG: on-screen build tag + entity hitbox outlines. Set DD_DEBUG to 1 to show. */
+#define DD_DEBUG    0
+#define DD_VERSION  "B17"
+
+/* Sprite sizing: each sprite is fit by its LARGER dimension into a
+   (hitbox * SCALE) square, so every entity ends up the same bounding size
+   regardless of art aspect ratio (wide crab vs tall Durio) and stays close to
+   its 24px hitbox. Player and enemies share one scale for consistency. */
+#define DURIO_SPRITE_SCALE 1.25f
+#define ENEMY_SPRITE_SCALE 1.25f
+#define NUT_SPRITE_SCALE   0.90f
+
+/*
+ * Draw an atlas sub-image fitted into a logical hitbox.
+ *   box_*      : the entity's logical box in screen px (where rectangles drew).
+ *   scale_mul  : HD overdraw — >1 makes the sprite bigger than its hitbox
+ *                (kept centered horizontally, bottom-aligned so feet stay put).
+ *   sx_mul/sy_mul : per-frame squash/stretch for procedural animation.
+ *   y_off      : vertical bob.
+ *   flip       : mirror horizontally (sprites are authored facing one way).
+ */
+static void draw_image_fit(int idx, float box_x, float box_y, float box_w, float box_h,
+                           float z, int flip, float scale_mul,
+                           float sx_mul, float sy_mul, float y_off) {
+    if (!g_sheet) return;
+    C2D_Image img = C2D_SpriteSheetGetImage(g_sheet, idx);
+    float iw = (float)img.subtex->width;
+    float ih = (float)img.subtex->height;
+    if (iw < 1.0f || ih < 1.0f) return;
+
+    float md   = (iw > ih) ? iw : ih;        /* fit by the larger dimension */
+    float base = (box_h / md) * scale_mul;   /* uniform bounding size across art */
+    float sx = base * sx_mul;
+    float sy = base * sy_mul;
+    float dw = iw * sx;
+    float dh = ih * sy;
+    float px = box_x + box_w * 0.5f - dw * 0.5f;   /* center on box X     */
+    float py = box_y + box_h - dh + y_off;         /* bottom-align to box  */
+
+    /* citro2d mirrors in place when scaleX is negative (draws right from px with
+       flipped texcoords), so px stays the same for both facings — adding dw here
+       shifted the mirrored sprite right by its full width. */
+    float draw_sx = flip ? -sx : sx;
+    C2D_DrawImageAt(img, px, py, z, NULL, draw_sx, sy);
+}
 
 /* ── Color palette ── */
 #define CLR_SKY         C2D_Color32(8,   6,   28,  255)  /* deep space */
@@ -89,7 +148,18 @@ static void draw_text_centered(float cx, float cy, float scale, u32 color, const
  * Background
  * ───────────────────────────────────────────────────────────── */
 
-static void draw_space_bg(int cam_x) {
+static void draw_space_bg(int cam_x, int cam_y) {
+    /* Vertical parallax: how far the camera has panned UP from the ground
+       (0 on the ground, grows as the player jumps/climbs). Far background
+       objects shift DOWN by a fraction of it — stars least, planet a bit more. */
+    int max_cy = LEVEL_MAX_H * TILE_PX - SCREEN_H;
+    if (max_cy < 0) max_cy = 0;
+    int up = max_cy - cam_y;
+    if (up < 0) up = 0;
+    float vshift_star   = up * 0.22f;
+    float vshift_planet = up * 0.34f;
+    const int STAR_DROP = 26;   /* push the whole starfield lower on screen */
+
     /* ── Stars: two parallax layers ──
        Each layer tiles over a 512-px virtual canvas.
        Far stars (1×1): divisor 8  → tile every ~4096 cam-px (more than a level)
@@ -112,44 +182,94 @@ static void draw_space_bg(int cam_x) {
         int sx    = (stars[i].x - shift + RANGE * 4) % RANGE;
         u32 color = (stars[i].sz == 1) ? CLR_STAR_FAR : CLR_STAR_NEAR;
         /* draw at sx and sx - RANGE for seamless tile */
+        float fy = (float)stars[i].y + STAR_DROP + vshift_star;
         for (int w = 0; w <= 1; w++) {
             float fx = (float)(sx - w * RANGE);
-            if (fx > -(float)stars[i].sz && fx < (float)SCREEN_W)
-                C2D_DrawRectSolid(fx, (float)stars[i].y, 0.03f,
+            if (fx > -(float)stars[i].sz && fx < (float)SCREEN_W
+                && fy < (float)SCREEN_H)
+                C2D_DrawRectSolid(fx, fy, 0.03f,
                                   (float)stars[i].sz, (float)stars[i].sz, color);
         }
     }
 
-    /* ── Planet: teal sphere, parallax 1/8, wrapping ──
-       Rendered as horizontal strips (2 px tall) to approximate a circle.
-       Wraps on a 440-px virtual canvas (SCREEN_W + planet_diameter):
-       exits left edge → reappears from right.                             */
-    {
-        static const struct { int dy; int hw; } pl[] = {
-            {-18,  8}, {-16, 12}, {-14, 15}, {-12, 17},
-            {-10, 18}, { -8, 19}, { -6, 20}, { -4, 20},
-            { -2, 20}, {  0, 20}, {  2, 20}, {  4, 20},
-            {  6, 19}, {  8, 18}, { 10, 17}, { 12, 15},
-            { 14, 12}, { 16,  8},
+    /* ── Distant celestial bodies (AI sprites): slow parallax, wrapping ──
+       Each wraps over its own virtual range so only one or two are on screen at
+       a time. Far bodies use a bigger divisor (move slower) and share the
+       vertical parallax with the stars. Drawn behind the stars (z 0.02). */
+    if (g_sheet) {
+        static const struct { int idx, bx, by, hdiv, wrap; } bg[] = {
+            { ATLAS_BG_MOON,    60, 16, 20, 640 },
+            { ATLAS_BG_PLANET2, 300, 22, 16, 780 },
+            { ATLAS_BG_NEBULA,  560, 40, 12, 920 },
         };
-        int npl = (int)(sizeof(pl) / sizeof(pl[0]));
-        /* Planet wraps: period = SCREEN_W + planet_diameter (440).
-           When it exits left it reappears from the right seamlessly. */
-        static const int PLANET_RANGE = 440;
-        int pshift   = (cam_x / 8) % PLANET_RANGE;
-        int pcx_base = (350 - pshift + PLANET_RANGE * 4) % PLANET_RANGE;
-        int pcy = 40;
+        for (int b = 0; b < (int)(sizeof(bg)/sizeof(bg[0])); b++) {
+            C2D_Image img = C2D_SpriteSheetGetImage(g_sheet, bg[b].idx);
+            float iw = (float)img.subtex->width;
+            int shift = (cam_x / bg[b].hdiv) % bg[b].wrap;
+            int base  = (bg[b].bx - shift + bg[b].wrap * 4) % bg[b].wrap;
+            float fy  = (float)bg[b].by + vshift_planet;
+            for (int w = 0; w <= 1; w++) {
+                float fx = (float)(base - w * bg[b].wrap);
+                if (fx > -iw && fx < (float)SCREEN_W)
+                    C2D_DrawImageAt(img, fx, fy, 0.02f, NULL, 1.0f, 1.0f);
+            }
+        }
+    }
+}
 
-        for (int w = 0; w <= 1; w++) {
-            int pcx = pcx_base - w * PLANET_RANGE;
-            for (int i = 0; i < npl; i++) {
-                int ry = pcy + pl[i].dy;
-                if (ry < 0 || ry >= SCREEN_H) continue;
-                if (pcx + pl[i].hw < 0 || pcx - pl[i].hw >= SCREEN_W) continue;
-                u32 c = (pl[i].dy < -8) ? CLR_PLANET_HI  :
-                        (pl[i].dy >  8) ? CLR_PLANET_DARK : CLR_PLANET_MID;
-                C2D_DrawRectSolid((float)(pcx - pl[i].hw), (float)ry,
-                                  0.02f, (float)(pl[i].hw * 2), 2.0f, c);
+/* ─────────────────────────────────────────────────────────────
+ * Ground scenery: distant mountain ridge (procedural) + wrecked-machine
+ * props standing on the horizon. Drawn behind the tiles (z < tile 0.2),
+ * with horizontal parallax so they read as distant background near the ground.
+ * ───────────────────────────────────────────────────────────── */
+
+static void draw_ground_scenery(int cam_x, int cam_y) {
+    int gy = (LEVEL_MAX_H - 2) * TILE_PX - cam_y;   /* ground-surface screen Y */
+    if (gy <= 0 || gy > SCREEN_H + 80) return;      /* ground off-screen */
+
+    /* ── Distant mountain ridge: procedural jagged peaks (reliable + tileable) ── */
+    {
+        static const struct { int x, h, hw; } pk[] = {
+            { 40, 44, 50}, {150, 66, 62}, {255, 36, 46}, {360, 72, 70},
+            {470, 52, 54}, {560, 32, 42},
+        };
+        u32 mc  = C2D_Color32(30, 26, 54, 255);    /* dark indigo body  */
+        u32 rim = C2D_Color32(54, 70, 96, 255);    /* faint cool rim    */
+        const int range = 620;
+        int shift = (cam_x * 30 / 100) % range;    /* parallax ~0.30    */
+        for (int w = -1; w <= 1; w++) {
+            for (int i = 0; i < (int)(sizeof(pk)/sizeof(pk[0])); i++) {
+                float px = (float)(pk[i].x - shift + w * range);
+                if (px + pk[i].hw < 0 || px - pk[i].hw > SCREEN_W) continue;
+                float ay = (float)(gy - pk[i].h);
+                C2D_DrawTriangle(px - pk[i].hw, (float)gy, mc,
+                                 px,            ay,        mc,
+                                 px + pk[i].hw, (float)gy, mc, 0.05f);
+                C2D_DrawTriangle(px,        ay,        rim,         /* lit left ridge */
+                                 px - 5,    ay + 9,    rim,
+                                 px + 1,    ay + 7,    rim, 0.051f);
+            }
+        }
+    }
+
+    /* ── Wrecked-machine props standing on the ground, parallax ~0.62 ── */
+    if (g_sheet) {
+        static const struct { int idx, bx, wrap; } pr[] = {
+            { ATLAS_BG_WRECK,  120, 760 },
+            { ATLAS_BG_DEBRIS, 470, 880 },
+            { ATLAS_BG_RIG,    820, 1010 },
+        };
+        for (int i = 0; i < (int)(sizeof(pr)/sizeof(pr[0])); i++) {
+            C2D_Image img = C2D_SpriteSheetGetImage(g_sheet, pr[i].idx);
+            float iw = (float)img.subtex->width;
+            float ih = (float)img.subtex->height;
+            int shift = (cam_x * 62 / 100) % pr[i].wrap;
+            int base  = (pr[i].bx - shift + pr[i].wrap * 8) % pr[i].wrap;
+            for (int w = 0; w <= 1; w++) {
+                float fx = (float)(base - w * pr[i].wrap);
+                if (fx > -iw && fx < (float)SCREEN_W)
+                    C2D_DrawImageAt(img, fx, (float)gy - ih + 2.0f, 0.08f,
+                                    NULL, 1.0f, 1.0f);
             }
         }
     }
@@ -159,16 +279,51 @@ static void draw_space_bg(int cam_x) {
  * Tile rendering
  * ───────────────────────────────────────────────────────────── */
 
-static void draw_tile(uint8_t type, float sx, float sy) {
+static void draw_tile(uint8_t type, float sx, float sy, int tx, int ty, int surface) {
     float ts = (float)TILE_PX;
+    /* stable per-CELL hash (depends on both tx and ty so stacked rows differ) */
+    unsigned hsh = (unsigned)(tx * 73856093) ^ (unsigned)(ty * 19349663);
+
+    /* Collectible-style tiles use the AI atlas when available; structural tiles
+       (ground/brick/blocks/totem) stay procedural — they tile seamlessly. */
+    if (g_sheet && (type == TILE_NUT || type == TILE_SHELL)) {
+        int idx   = (type == TILE_NUT) ? ATLAS_NUT_0 : ATLAS_SNAIL_SHELL;
+        float scl = (type == TILE_NUT) ? NUT_SPRITE_SCALE : 1.0f;
+        draw_image_fit(idx, sx, sy, ts, ts, 0.2f, 0, scl, 1.0f, 1.0f, 0.0f);
+        return;
+    }
+
     switch (type) {
-    case TILE_GROUND:
-        /* Alien rock: dark body + lighter blue-gray surface + crack seam */
-        C2D_DrawRectSolid(sx, sy,          0.2f,  ts,  ts,     CLR_ROCK_BODY);
-        C2D_DrawRectSolid(sx, sy,          0.21f, ts,  4,      CLR_ROCK_TOP);
-        C2D_DrawRectSolid(sx, sy + ts/2,   0.21f, ts,  1,      CLR_ROCK_CRACK);
-        C2D_DrawRectSolid(sx, sy + ts - 1, 0.21f, ts,  1,      CLR_ROCK_CRACK);
+    case TILE_GROUND: {
+        if (surface) {
+            /* Surface tile: lit blue-gray rock top, lighter body */
+            C2D_DrawRectSolid(sx, sy,            0.2f,   ts, ts,       CLR_ROCK_BODY);
+            C2D_DrawRectSolid(sx, sy + ts*0.55f, 0.205f, ts, ts*0.45f, C2D_Color32(42, 54, 66, 255));
+            C2D_DrawRectSolid(sx, sy,            0.21f,  ts, 5,        CLR_ROCK_TOP);
+            C2D_DrawRectSolid(sx, sy,            0.211f, ts, 2,        C2D_Color32(125, 152, 172, 255));
+            /* a couple of pseudo-random surface boulders */
+            if ((hsh & 3) == 0)
+                C2D_DrawRectSolid(sx + 4 + (hsh >> 5) % (TILE_PX - 12), sy + 4,
+                                  0.212f, 6, 4, C2D_Color32(96, 120, 138, 255));
+        } else {
+            /* Buried tile: darker, no top light, with a faint strata seam */
+            C2D_DrawRectSolid(sx, sy,           0.2f,   ts, ts,      C2D_Color32(40, 50, 62, 255));
+            C2D_DrawRectSolid(sx, sy + ts*0.5f, 0.205f, ts, ts*0.5f, C2D_Color32(31, 39, 49, 255));
+            C2D_DrawRectSolid(sx, sy + 1 + (hsh % 4), 0.206f, ts, 1, C2D_Color32(50, 62, 76, 255));
+        }
+        /* per-CELL detail — differs every tile, so the two ground layers differ */
+        C2D_DrawRectSolid(sx + 2, sy + 6 + (hsh % (TILE_PX - 10)), 0.212f, ts - 6, 1, CLR_ROCK_CRACK);
+        C2D_DrawRectSolid(sx + 3 + (hsh >> 3)  % (TILE_PX - 8),
+                          sy + 6 + (hsh >> 7)  % (TILE_PX - 10), 0.213f, 2, 2,
+                          C2D_Color32(72, 88, 102, 255));
+        C2D_DrawRectSolid(sx + 3 + (hsh >> 11) % (TILE_PX - 7),
+                          sy + 7 + (hsh >> 15) % (TILE_PX - 11), 0.213f, 1, 1,
+                          C2D_Color32(38, 48, 58, 255));
+        if ((hsh % 6) == 0)   /* occasional teal mineral fleck */
+            C2D_DrawRectSolid(sx + 2 + (hsh >> 19) % (TILE_PX - 6),
+                              sy + ts - 7, 0.214f, 2, 2, C2D_Color32(60, 180, 160, 255));
         break;
+    }
     case TILE_BRICK:
         /* Metallic panel: steel base + beveled edges + corner rivets */
         C2D_DrawRectSolid(sx,        sy,        0.2f,  ts,    ts,    CLR_METAL_BASE);
@@ -190,11 +345,21 @@ static void draw_tile(uint8_t type, float sx, float sy) {
         C2D_DrawRectSolid(sx,      sy+ts-2, 0.21f, ts, 2,  CLR_PLANET_HI);
         C2D_DrawRectSolid(sx,      sy,      0.21f, 2,  ts, CLR_PLANET_HI);
         C2D_DrawRectSolid(sx+ts-2, sy,      0.21f, 2,  ts, CLR_PLANET_HI);
-        /* Hex-nut icon: three strips forming hexagon + center hole */
-        C2D_DrawRectSolid(sx + 5,  sy + 4,  0.22f, 6, 2, CLR_NUT);
-        C2D_DrawRectSolid(sx + 4,  sy + 6,  0.22f, 8, 4, CLR_NUT);
-        C2D_DrawRectSolid(sx + 5,  sy + 10, 0.22f, 6, 2, CLR_NUT);
-        C2D_DrawRectSolid(sx + 6,  sy + 7,  0.23f, 4, 2, hull);  /* hole */
+        /* Nut icon: real sprite, centered at ~62% of the tile */
+        if (g_sheet) {
+            C2D_Image ni = C2D_SpriteSheetGetImage(g_sheet, ATLAS_NUT_0);
+            float iw = (float)ni.subtex->width, ih = (float)ni.subtex->height;
+            float md = (iw > ih) ? iw : ih;
+            float s  = (ts * 0.62f) / md;
+            float dw = iw * s, dh = ih * s;
+            C2D_DrawImageAt(ni, sx + (ts - dw) * 0.5f, sy + (ts - dh) * 0.5f,
+                            0.22f, NULL, s, s);
+        } else {
+            /* fallback hex-nut, scaled to the tile */
+            float c = ts * 0.5f, r = ts * 0.28f;
+            C2D_DrawRectSolid(sx + c - r,     sy + c - r,     0.22f, r*2, r*2, CLR_NUT);
+            C2D_DrawRectSolid(sx + c - r*0.5f, sy + c - r*0.5f, 0.23f, r, r, CLR_NUT_DARK);
+        }
         break;
     }
     case TILE_QBLOCK_USED: {
@@ -249,17 +414,20 @@ static void draw_tile(uint8_t type, float sx, float sy) {
 static void draw_tilemap(const Game *g) {
     const Level *lvl = &g->level;
     int cam_x = lvl->cam_x;
+    int cam_y = lvl->cam_y;
 
     int tx0 = cam_x / TILE_PX;
     int tx1 = tx0 + SCREEN_W / TILE_PX + 2;
 
     for (int ty = 0; ty < lvl->height; ty++) {
-        float sy = (float)(ty * TILE_PX);
+        float sy = (float)(ty * TILE_PX - cam_y);
+        if (sy + TILE_PX < 0 || sy >= SCREEN_H) continue;   /* off-screen row */
         for (int tx = tx0; tx <= tx1; tx++) {
             uint8_t tile = level_tile(lvl, tx, ty);
             if (tile == TILE_AIR) continue;
             float sx = (float)(tx * TILE_PX - cam_x);
-            draw_tile(tile, sx, sy);
+            int surface = (level_tile(lvl, tx, ty - 1) != TILE_GROUND);
+            draw_tile(tile, sx, sy, tx, ty, surface);
         }
     }
 }
@@ -273,11 +441,27 @@ static void draw_durio(const Game *g) {
     if (m->state == DURIO_DEAD && (m->dead_timer / 80) & 1) return; /* blink */
 
     int cam_x = g->level.cam_x;
+    int cam_y = g->level.cam_y;
     float sx  = (float)durio_screen_x(m, cam_x);
-    float sy  = (float)durio_screen_y(m);
+    float sy  = (float)durio_screen_y(m) - cam_y;
     float w   = (float)DURIO_W;
     float h   = (float)durio_height(m);
     float z   = 0.5f;
+
+    if (g_sheet) {
+        int flip = (m->dir == DURIO_FACE_LEFT);     /* art faces right */
+        int idx;
+        static const int wk[3] = { ATLAS_DURIO_WALK0, ATLAS_DURIO_WALK1,
+                                   ATLAS_DURIO_WALK2 };
+        if (m->state == DURIO_DEAD)                  idx = ATLAS_DURIO_DEAD;
+        else if (!m->on_ground)                      idx = ATLAS_DURIO_JUMP;
+        else if (m->vx_fp > FP_ONE || m->vx_fp < -FP_ONE)
+                                                     idx = wk[m->walk_frame % 3];
+        else                                         idx = ATLAS_DURIO_STAND;
+        draw_image_fit(idx, sx, sy, w, h, z, flip,
+                       DURIO_SPRITE_SCALE, 1.0f, 1.0f, 0.0f);
+        return;
+    }
 
     /*
      * Alien space explorer — 16×16:
@@ -319,17 +503,40 @@ static void draw_durio(const Game *g) {
 
 static void draw_enemies(const Game *g) {
     int cam_x = g->level.cam_x;
+    int cam_y = g->level.cam_y;
 
     for (int i = 0; i < MAX_ENEMIES; i++) {
         const Enemy *e = &g->enemies[i];
         if (e->type == ENEMY_NONE || e->status == ENEMY_DEAD) continue;
 
         float sx = (float)(FP_TO_INT(e->x_fp) - cam_x);
-        float sy = (float)FP_TO_INT(e->y_fp);
+        float sy = (float)FP_TO_INT(e->y_fp) - cam_y;
         float w  = (float)ENEMY_W;
         float z  = 0.45f;
 
         if (sx + w < 0 || sx > SCREEN_W) continue; /* off-screen */
+
+        if (g_sheet) {
+            int flip = (e->vx_fp > 0);              /* art faces left */
+            float h  = (float)ENEMY_H;
+            int anim = (FP_TO_INT(e->x_fp) >> 3) & 1;  /* 2-frame gait, tied to movement */
+            if (e->type == ENEMY_CRAB) {
+                if (e->status == ENEMY_SQUISHED)
+                    draw_image_fit(ATLAS_CRAB_WALK0, sx, sy, w, h, z, flip,
+                                   ENEMY_SPRITE_SCALE, 1.15f, 0.42f, 0.0f);
+                else
+                    draw_image_fit(anim ? ATLAS_CRAB_WALK1 : ATLAS_CRAB_WALK0,
+                                   sx, sy, w, h, z, flip, ENEMY_SPRITE_SCALE, 1.0f, 1.0f, 0.0f);
+            } else if (e->type == ENEMY_SNAIL) {
+                if (e->status == ENEMY_SHELL)
+                    draw_image_fit(ATLAS_SNAIL_SHELL, sx, sy, w, h, z, 0,
+                                   ENEMY_SPRITE_SCALE, 1.0f, 1.0f, 0.0f);
+                else
+                    draw_image_fit(anim ? ATLAS_SNAIL_WALK1 : ATLAS_SNAIL_WALK0,
+                                   sx, sy, w, h, z, flip, ENEMY_SPRITE_SCALE, 1.0f, 1.0f, 0.0f);
+            }
+            continue;
+        }
 
         switch (e->type) {
         case ENEMY_CRAB: {
@@ -379,16 +586,26 @@ static void draw_enemies(const Game *g) {
 
 static void draw_nuts(const Game *g) {
     int cam_x = g->level.cam_x;
+    int cam_y = g->level.cam_y;
 
     for (int i = 0; i < MAX_NUTS; i++) {
         const Nut *c = &g->nuts[i];
         if (!c->active) continue;
 
         float sx = (float)(FP_TO_INT(c->x_fp) - cam_x);
-        float sy = (float)FP_TO_INT(c->y_fp);
+        float sy = (float)FP_TO_INT(c->y_fp) - cam_y;
 
         /* Tumble animation: alternate wide/narrow (nut spinning) */
         int frame = (c->anim_timer / 80) % 4;
+
+        if (g_sheet) {
+            float sxm = (frame == 1 || frame == 3) ? 0.35f : 1.0f;   /* spin */
+            float box = (float)TILE_PX;
+            draw_image_fit(ATLAS_NUT_0, sx, sy, box, box, 0.4f, 0,
+                           NUT_SPRITE_SCALE, sxm, 1.0f, 0.0f);
+            continue;
+        }
+
         float nw  = (frame == 1 || frame == 3) ? 4.0f : 10.0f;
         float nx_off = (TILE_PX - nw) / 2.0f;
         float nh  = 10.0f;
@@ -443,11 +660,11 @@ static void draw_overlay(const Game *g) {
  * ───────────────────────────────────────────────────────────── */
 
 static void render_top_3ds(const Game *g) {
-    /* Space sky: dark top, subtle purple near horizon */
-    C2D_DrawRectSolid(0, 0,              0.01f, SCREEN_W, SCREEN_H * 5 / 8, CLR_SKY);
-    C2D_DrawRectSolid(0, SCREEN_H*5/8,  0.01f, SCREEN_W, SCREEN_H * 3 / 8, CLR_SKY_BOTTOM);
+    /* Space sky: uniform deep space (background objects carry the depth now) */
+    C2D_DrawRectSolid(0, 0, 0.01f, SCREEN_W, SCREEN_H, CLR_SKY);
 
-    draw_space_bg(g->level.cam_x);
+    draw_space_bg(g->level.cam_x, g->level.cam_y);
+    draw_ground_scenery(g->level.cam_x, g->level.cam_y);
     draw_tilemap(g);
     draw_nuts(g);
     draw_enemies(g);
@@ -456,6 +673,46 @@ static void render_top_3ds(const Game *g) {
         draw_durio(g);
 
     draw_overlay(g);
+
+#if DD_DEBUG
+    {
+        int cx = g->level.cam_x, cy = g->level.cam_y;
+        u32 cyan  = C2D_Color32(0, 255, 255, 255);
+        u32 green = C2D_Color32(0, 255, 0, 255);
+        u32 yellow= C2D_Color32(255, 255, 0, 255);
+        u32 mag   = C2D_Color32(255, 0, 255, 255);
+        const Durio *m = &g->durio;
+        /* cyan hitbox of durio */
+        if (g->state != GAME_TITLE) {
+            float bx = (float)durio_screen_x(m, cx);
+            float by = (float)FP_TO_INT(m->y_fp) - cy;
+            C2D_DrawRectSolid(bx, by, 0.7f, DURIO_W, 1, cyan);
+            C2D_DrawRectSolid(bx, by + DURIO_H - 1, 0.7f, DURIO_W, 1, cyan);
+            C2D_DrawRectSolid(bx, by, 0.7f, 1, DURIO_H, cyan);
+            C2D_DrawRectSolid(bx + DURIO_W - 1, by, 0.7f, 1, DURIO_H, cyan);
+        }
+        /* magenta hitboxes of enemies */
+        for (int i = 0; i < MAX_ENEMIES; i++) {
+            const Enemy *e = &g->enemies[i];
+            if (e->type == ENEMY_NONE || e->status == ENEMY_DEAD) continue;
+            float bx = (float)(FP_TO_INT(e->x_fp) - cx);
+            float by = (float)FP_TO_INT(e->y_fp) - cy;
+            float eh = (e->status == ENEMY_SQUISHED) ? ENEMY_H_SQUISH : ENEMY_H;
+            C2D_DrawRectSolid(bx, by, 0.7f, ENEMY_W, 1, mag);
+            C2D_DrawRectSolid(bx, by + eh - 1, 0.7f, ENEMY_W, 1, mag);
+            C2D_DrawRectSolid(bx, by, 0.7f, 1, eh, mag);
+            C2D_DrawRectSolid(bx + ENEMY_W - 1, by, 0.7f, 1, eh, mag);
+        }
+
+        char db[64];
+        snprintf(db, sizeof(db), "%s X%d VX%d", DD_VERSION,
+                 (int)FP_TO_INT(m->x_fp), (int)FP_TO_INT(m->vx_fp));
+        draw_text(4, 30, 2.2f, green, db);
+        snprintf(db, sizeof(db), "CX%d MX%d OG%d", g->level.cam_x,
+                 (int)FP_TO_INT(g->max_player_x_fp), m->on_ground);
+        draw_text(4, 52, 2.2f, yellow, db);
+    }
+#endif
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -493,7 +750,7 @@ static void render_bottom_3ds(const Game *g) {
         draw_text(8, by, 1.8f, CLR_GRAY, "START: Play");
         break;
     case GAME_PLAYING:
-        draw_text(8, by, 1.5f, CLR_GRAY, "DPAD:Move  A/B:Jump  Y:Run");
+        draw_text(8, by, 1.5f, CLR_GRAY, "DPAD:Move  A/B:Jump  L:Run");
         break;
     case GAME_PAUSED:
         draw_text(8, by, 1.8f, CLR_GRAY, "START: Resume  B: Quit");
@@ -512,11 +769,18 @@ void render_init_3ds(void) {
     C3D_Init(C3D_DEFAULT_CMDBUF_SIZE);
     C2D_Init(C2D_DEFAULT_MAX_OBJECTS);
     C2D_Prepare();
+
+    /* Load the AI-generated entity atlas from romfs. On failure g_sheet stays
+       NULL and every entity falls back to its procedural rectangle drawing. */
+    romfsInit();
+    g_sheet = C2D_SpriteSheetLoad("romfs:/gfx/sprites.t3x");
 }
 
 void render_exit_3ds(void) {
+    if (g_sheet) C2D_SpriteSheetFree(g_sheet);
     C2D_Fini();
     C3D_Fini();
+    romfsExit();
 }
 
 void render_frame_3ds(const Game *g,

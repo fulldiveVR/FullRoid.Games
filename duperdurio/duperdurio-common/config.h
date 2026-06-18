@@ -8,6 +8,12 @@
 #define FP_TO_INT(a)     ((a) >> FP_SHIFT)
 #define INT_TO_FP(a)     ((a) << FP_SHIFT)
 
+/* Integrate an fp-per-second value over delta_ms (x is already fixed-point).
+   Uses int64 internally: FP_MUL(x, INT_TO_FP(delta_ms)) overflows int32 once x
+   is HD-scaled (e.g. GRAVITY*INT_TO_FP(16) > 2^31), which silently flips the
+   sign and sends entities flying upward. */
+#define FP_STEP(x, dt)   ((int32_t)((int64_t)(x) * (dt) / 1000))
+
 /* --- Screen (3DS only target) --- */
 #define SCREEN_W         400
 #define SCREEN_H         240
@@ -15,9 +21,13 @@
 #define BOT_SCREEN_H     240
 
 /* --- Tile grid --- */
-#define TILE_SIZE        16   /* logical game tile in px */
-#define TILE_SCALE       1    /* render scale: 16x16 px per tile (fits 15 rows in 240px screen) */
-#define TILE_PX          (TILE_SIZE * TILE_SCALE)   /* 32 — drawn tile size */
+/* HD: 24px tiles. The level is LEVEL_MAX_H*24 = 360px tall — taller than the
+   240px screen — so the camera scrolls vertically (Level.cam_y). The 21 map
+   patterns keep their 15-row layout; world-space physics constants below are
+   scaled x1.5 vs the old 16px grid so jump arcs / gaps stay the same in tiles. */
+#define TILE_SIZE        24   /* logical game tile in px */
+#define TILE_SCALE       1    /* render scale */
+#define TILE_PX          (TILE_SIZE * TILE_SCALE)   /* 24 — drawn tile size */
 
 /* Ground level: y-coord of the top of the ground row in screen pixels */
 #define GROUND_Y         (SCREEN_H - TILE_PX)       /* = 208 */
@@ -26,23 +36,23 @@
 #define DURIO_W          TILE_PX          /* 16 px wide */
 #define DURIO_H          TILE_PX          /* 16 px tall */
 
-/* Hitbox insets (shrink drawn rect for collision) */
-#define DURIO_HIT_INSET_X   2
-#define DURIO_HIT_INSET_TOP 2
-#define DURIO_HIT_INSET_BOT 1
+/* Hitbox insets (shrink drawn rect for collision) — scaled for 24px tiles */
+#define DURIO_HIT_INSET_X   3
+#define DURIO_HIT_INSET_TOP 3
+#define DURIO_HIT_INSET_BOT 2
 
 /* --- Enemy sprite --- */
 #define ENEMY_W          TILE_PX          /* 32 px */
 #define ENEMY_H          TILE_PX          /* 32 px */
 #define ENEMY_H_SQUISH   (TILE_PX / 2)   /* 16 px (squished Crab) */
 
-/* --- Physics (fixed-point units per second) --- */
-#define GRAVITY          INT_TO_FP(1400)  /* downward accel per second */
-#define JUMP_VELOCITY    INT_TO_FP(-520)  /* initial jump vel (upward) */
+/* --- Physics (fixed-point units per second) --- scaled x1.5 for 24px tiles */
+#define GRAVITY          INT_TO_FP(2100)  /* downward accel per second */
+#define JUMP_VELOCITY    INT_TO_FP(-780)  /* initial jump vel (upward) */
 #define JUMP_HOLD_MIN    150              /* ms: min time A held for full jump */
-#define WALK_SPEED       INT_TO_FP(100)
-#define RUN_SPEED        INT_TO_FP(180)
-#define ENEMY_SPEED      INT_TO_FP(60)
+#define WALK_SPEED       INT_TO_FP(150)
+#define RUN_SPEED        INT_TO_FP(270)
+#define ENEMY_SPEED      INT_TO_FP(90)
 
 /* --- Game limits --- */
 #define MAX_ENEMIES      16

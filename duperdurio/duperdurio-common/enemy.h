@@ -13,6 +13,7 @@ typedef enum {
 typedef enum {
     ENEMY_ALIVE,
     ENEMY_SQUISHED,   /* Crab: brief squish animation then removed */
+    ENEMY_SHELL,      /* Snail: static shell left exactly where it was stomped */
     ENEMY_DEAD        /* Remove next frame */
 } EnemyStatus;
 

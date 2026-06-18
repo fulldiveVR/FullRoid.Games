@@ -12,7 +12,7 @@ void input_poll_3ds(InputState *s) {
 
     s->left      = ((held & KEY_DLEFT)  || cp.dx < -40) ? 1 : 0;
     s->right     = ((held & KEY_DRIGHT) || cp.dx >  40) ? 1 : 0;
-    s->run       = (held & KEY_Y) ? 1 : 0;
+    s->run       = (held & (KEY_L | KEY_Y)) ? 1 : 0;  /* L (index finger) + Y */
     s->jump_down = (down & (KEY_A | KEY_B)) ? 1 : 0;
     s->jump_held = (held & (KEY_A | KEY_B)) ? 1 : 0;
     s->pause     = (down & KEY_START) ? 1 : 0;

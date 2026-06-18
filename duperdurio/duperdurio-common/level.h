@@ -13,6 +13,7 @@ typedef struct {
     int      width;          /* = MAP_BUF_W = 150 (buffer width) */
     int      height;         /* = LEVEL_MAX_H = 15 */
     int      cam_x;          /* camera X in world pixels */
+    int      cam_y;          /* camera Y in world pixels (vertical scroll) */
     int      base_block_idx; /* world index of the leftmost loaded block */
 } Level;
 

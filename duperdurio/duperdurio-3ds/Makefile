@@ -20,6 +20,10 @@ INCLUDES    := source \
 APP_TITLE   := DuperDurio
 APP_DESCRIPTION := Classic Super Durio for 3DS
 APP_AUTHOR  := DuperDurio Port
+
+# AI-generated entity sprite atlas is bundled via romfs (romfs/gfx/sprites.t3x,
+# built by tex3ds from gfx/sprites.t3s — see build-3ds.sh).
+ROMFS       := romfs
 #---------------------------------------------------------------------------------
 
 ARCH     := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
@@ -40,6 +44,12 @@ ifneq ($(BUILD),$(notdir $(CURDIR)))
 
 export OUTPUT  := $(CURDIR)/$(TARGET)
 export TOPDIR  := $(CURDIR)
+
+# Bundle the sprite atlas romfs into the .3dsx. 3dsxtool requires an SMDH
+# alongside --romfs, so embed both (the .smdh is built in build-3ds.sh).
+ifneq ($(strip $(ROMFS)),)
+export _3DSXFLAGS += --smdh=$(CURDIR)/$(TARGET).smdh --romfs=$(CURDIR)/$(ROMFS)
+endif
 export VPATH   := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
 export DEPSDIR := $(CURDIR)/$(BUILD)
 
